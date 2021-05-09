@@ -328,14 +328,6 @@ QString StateMachine::initialState() const
 
 bool StateMachine::setInitialState(const QString &stateName)
 {
-    // Check if the initial state is allowed to be set at this time
-    if (m_started)
-    {
-        qCWarning(s_loggingCategory)
-                << "Initial state can be set only when the state machine is stopped";
-        return false;
-    }
-
     // Check if the initial state is already set
     if (!m_initialState.isEmpty())
     {
@@ -376,12 +368,6 @@ bool StateMachine::addTransition(const QString &fromState,
     }
 
     // Check if the state and event names are valid
-    if (fromState.isEmpty())
-    {
-        qCWarning(s_loggingCategory) << "Name of the state to transition from cannot be empty";
-        return false;
-    }
-
     if (!m_states.contains(fromState))
     {
         qCWarning(s_loggingCategory) << "State to transition from does not exist:" << fromState;
@@ -392,12 +378,6 @@ bool StateMachine::addTransition(const QString &fromState,
     {
         qCWarning(s_loggingCategory)
                 << "Name of the event that triggers the transition cannot be empty";
-        return false;
-    }
-
-    if (toState.isEmpty())
-    {
-        qCWarning(s_loggingCategory) << "Name of the state to transition to cannot be empty";
         return false;
     }
 

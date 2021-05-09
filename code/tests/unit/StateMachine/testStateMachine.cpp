@@ -51,9 +51,9 @@ private slots:
     // Test functions
     void testValidation();
     void testStartStop();
-    // TODO: testAddState
-    // TODO: testSetInitialState
-    // TODO: testAddTransition
+    void testAddState();
+    void testSetInitialState();
+    void testAddTransition();
     // TODO: test entry, exit, transition guard, and transition action methods
     // TODO: test transitions to the same state
     // TODO: test state loops
@@ -198,6 +198,7 @@ void TestStateMachine::testStartStop()
     QVERIFY(stateMachine.validate());
     QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
 
+    QVERIFY(!stateMachine.finalStateReached());
     QVERIFY(!stateMachine.isStarted());
     QVERIFY(stateMachine.start());
 
@@ -205,6 +206,7 @@ void TestStateMachine::testStartStop()
     // machine must stop immediately
     QVERIFY(!stateMachine.isStarted());
     QCOMPARE(stateMachine.currentState(), "init");
+    QVERIFY(stateMachine.finalStateReached());
 
     // Stopping the state machine must fail if it is already stopped but it must not have any effect
     // on the state machine
@@ -222,6 +224,7 @@ void TestStateMachine::testStartStop()
     QVERIFY(stateMachine.start());
     QVERIFY(stateMachine.isStarted());
     QCOMPARE(stateMachine.currentState(), "init");
+    QVERIFY(!stateMachine.finalStateReached());
 
     // Starting the state machine must fail if it is already started but it must not have any effect
     // on the state machine
@@ -233,11 +236,136 @@ void TestStateMachine::testStartStop()
     QVERIFY(stateMachine.stop());
     QVERIFY(!stateMachine.isStarted());
     QCOMPARE(stateMachine.currentState(), "init");
+    QVERIFY(!stateMachine.finalStateReached());
 
     // Stopping the state machine must fail if it is already stopped but it must not have any effect
     // on the state machine
     QVERIFY(!stateMachine.stop());
     QVERIFY(!stateMachine.isStarted());
+    QCOMPARE(stateMachine.currentState(), "init");
+    QVERIFY(!stateMachine.finalStateReached());
+}
+
+// Test: addState() --------------------------------------------------------------------------------
+
+void TestStateMachine::testAddState()
+{
+    StateMachine stateMachine;
+
+    // Add a state
+    QVERIFY(stateMachine.addState("a"));
+
+    // Add a state with duplicate name
+    QVERIFY(!stateMachine.addState("a"));
+
+    // Add a state with an empty name
+    QVERIFY(!stateMachine.addState(""));
+
+    // Add a state with entry method
+    QVERIFY(stateMachine.addState("b", [](const Event &) {}));
+
+    // Add a state with exit method
+    QVERIFY(stateMachine.addState("c", {}, [](const Event &) {}));
+
+    // Add a state with entry and exit method
+    QVERIFY(stateMachine.addState("d", [](const Event &) {}, [](const Event &) {}));
+
+    // Set the initial state and add transitions to make the state machine valid then start it
+    QVERIFY(stateMachine.setInitialState("a"));
+
+    QVERIFY(stateMachine.addTransition("a", "to_b", "b"));
+    QVERIFY(stateMachine.addTransition("a", "to_c", "c"));
+    QVERIFY(stateMachine.addTransition("a", "to_d", "d"));
+
+    QVERIFY(stateMachine.addTransition("c", "to_b", "b"));
+    QVERIFY(stateMachine.addTransition("d", "to_b", "b"));
+
+    QVERIFY(stateMachine.validate());
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
+
+    QVERIFY(stateMachine.start());
+    QVERIFY(stateMachine.isStarted());
+
+    // Add a state while state machine is started
+    QVERIFY(!stateMachine.addState("e"));
+}
+
+// Test: setInitialState() -------------------------------------------------------------------------
+
+void TestStateMachine::testSetInitialState()
+{
+    StateMachine stateMachine;
+
+    // Add states
+    QVERIFY(stateMachine.addState("a"));
+    QVERIFY(stateMachine.addState("b"));
+    QVERIFY(stateMachine.initialState().isEmpty());
+
+    // Set an initial state that with an empty name
+    QVERIFY(!stateMachine.setInitialState(""));
+    QVERIFY(stateMachine.initialState().isEmpty());
+
+    // Set an initial state that doesn't exists
+    QVERIFY(!stateMachine.setInitialState("x"));
+    QVERIFY(stateMachine.initialState().isEmpty());
+
+    // Set a valid initial state
+    QVERIFY(stateMachine.setInitialState("a"));
+    QCOMPARE(stateMachine.initialState(), "a");
+
+    // Set the same initial state again
+    QVERIFY(!stateMachine.setInitialState("a"));
+    QCOMPARE(stateMachine.initialState(), "a");
+
+    // Set the another initial state
+    QVERIFY(!stateMachine.setInitialState("b"));
+    QCOMPARE(stateMachine.initialState(), "a");
+}
+
+// Test: Constructor -------------------------------------------------------------------------------
+
+void TestStateMachine::testAddTransition()
+{
+    StateMachine stateMachine;
+
+    // Add states
+    QVERIFY(stateMachine.addState("a"));
+    QVERIFY(stateMachine.addState("b"));
+    QVERIFY(stateMachine.addState("c"));
+
+    // Add transitions with invalid state and event names
+    QVERIFY(!stateMachine.addTransition("",  "event", "c"));
+    QVERIFY(!stateMachine.addTransition("d", "event", "c"));
+    QVERIFY(!stateMachine.addTransition("a", "",      "c"));
+    QVERIFY(!stateMachine.addTransition("a", "event", ""));
+    QVERIFY(!stateMachine.addTransition("a", "event", "d"));
+
+    // Add transitions with and without guard and action methods
+    QVERIFY(stateMachine.addTransition("a", "event1", "b"));
+    QVERIFY(stateMachine.addTransition("a", "event2", "b",
+                                       [](const Event &) { return true; }));
+    QVERIFY(stateMachine.addTransition("a", "event3", "b",
+                                       {}, [](const Event &) {}));
+    QVERIFY(stateMachine.addTransition("a", "event4", "b",
+                                       [](const Event &) { return true; }, [](const Event &) {}));
+
+    // Add duplicate transition
+    QVERIFY(stateMachine.addTransition("a", "event", "c"));
+    QVERIFY(!stateMachine.addTransition("a", "event", "c"));
+
+    // Set the initial state and add transitions to make the state machine valid then start it
+    QVERIFY(stateMachine.setInitialState("a"));
+
+    QVERIFY(stateMachine.addTransition("b", "to_c", "c"));
+
+    QVERIFY(stateMachine.validate());
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
+
+    QVERIFY(stateMachine.start());
+    QVERIFY(stateMachine.isStarted());
+
+    // Add a transition while state machine is started
+    QVERIFY(!stateMachine.addTransition("a", "event5", "b"));
 }
 
 // Main function -----------------------------------------------------------------------------------
