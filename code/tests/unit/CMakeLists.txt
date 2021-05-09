@@ -41,6 +41,7 @@ endfunction()
 # --------------------------------------------------------------------------------------------------
 add_subdirectory(Event)
 add_subdirectory(EventWithData)
+add_subdirectory(StateMachine)
 
 # --------------------------------------------------------------------------------------------------
 # Code Coverage

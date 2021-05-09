@@ -153,6 +153,14 @@ public:
     QString currentState() const;
 
     /*!
+     * Checks if the state machine has reached a final state (current state is set to a final state)
+     *
+     * \retval  true    Final state was reached
+     * \retval  false   Final state not reached
+     */
+    bool finalStateReached();
+
+    /*!
      * Checks if the state machine has any pending events
      *
      * \retval  true    State machine has at least one pending event
@@ -270,6 +278,9 @@ private:
      * \param[in,out]   statesReached   Container for recording all the reached states
      */
     void traverseStates(const QString &stateName, QSet<QString> *statesReached) const;
+
+    //! Transition the state machine to the initial state (only execute during start!)
+    void transitionToInitalState();
 
     /*!
      * Executes the transition

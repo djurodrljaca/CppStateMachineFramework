@@ -156,7 +156,7 @@ bool StateMachine::start()
     m_started = true;
     qCDebug(s_loggingCategory) << "State machine started";
 
-    executeTransition(TransitionData { m_initialState, {}, {} }, Event(QString()));
+    transitionToInitalState();
     return true;
 }
 
@@ -186,6 +186,20 @@ bool StateMachine::stop()
 QString StateMachine::currentState() const
 {
     return m_currentState;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool StateMachine::finalStateReached()
+{
+    // Check if the current state is set to a valid state
+    if (!m_states.contains(m_currentState))
+    {
+        return false;
+    }
+
+    // Check if current state is a final state (no transitions to other states)
+    return m_states[m_currentState].transitions.isEmpty();
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -435,6 +449,32 @@ void StateMachine::traverseStates(const QString &stateName, QSet<QString> *state
 
         // Traverse state from the transition
         traverseStates(transitionData.state, statesReached);
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+void StateMachine::transitionToInitalState()
+{
+    // Transition to the initial state
+    m_currentState = m_initialState;
+    qCDebug(s_loggingCategory) << "Transitioned to initial state:" << m_currentState;
+
+    // Execute the entry method of the initial state
+    auto &stateData = m_states[m_currentState];
+
+    if (stateData.entryMethod)
+    {
+        qCDebug(s_loggingCategory) << "Executing entry method...";
+        stateData.entryMethod(Event(QString()));
+        qCDebug(s_loggingCategory) << "Entry method executed";
+    }
+
+    // Check if the initial state is also a final state
+    if (stateData.transitions.isEmpty())
+    {
+        qCDebug(s_loggingCategory) << "Transitioned to a final state";
+        stop();
     }
 }
 
