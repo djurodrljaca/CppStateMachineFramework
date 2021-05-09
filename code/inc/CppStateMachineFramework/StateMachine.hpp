@@ -24,7 +24,7 @@
 #include <CppStateMachineFramework/Event.hpp>
 
 // Qt includes
-#include <QtCore/QSet>
+#include <QtCore/QHash>
 
 // System includes
 #include <deque>
@@ -54,16 +54,6 @@ public:
         //! State machine is not valid (validation failed)
         Invalid
     };
-
-    /*!
-     * Type alias for a state machine entry method
-     */
-    using StateMachineEntryMethod = std::function<void()>;
-
-    /*!
-     * Type alias for a state machine exit method
-     */
-    using StateMachineExitMethod = std::function<void()>;
 
     /*!
      * Type alias for a state entry method
@@ -126,7 +116,8 @@ public:
      * Validates the state and state transitions
      *
      * \retval  true    Success
-     * \retval  false   Failure
+     * \retval  false   Failure (state machine not stopped, no states, no initial state, invalid
+     *                  final states, unreachable states)
      */
     bool validate();
 
@@ -142,7 +133,7 @@ public:
      * Start the state machine
      *
      * \retval  true    Success
-     * \retval  false   Failure
+     * \retval  false   Failure (state machine already started or invalid)
      */
     bool start();
 
@@ -150,7 +141,7 @@ public:
      * Start the state machine
      *
      * \retval  true    Success
-     * \retval  false   Failure
+     * \retval  false   Failure (state machine already stopped)
      */
     bool stop();
 
@@ -175,7 +166,7 @@ public:
      * \param   event   Event
      *
      * \retval  true    Success
-     * \retval  false   Failure
+     * \retval  false   Failure (null, empty event name, state machine not started)
      */
     bool addEvent(std::unique_ptr<Event> event);
 
@@ -183,9 +174,23 @@ public:
      * Processes the next pending event
      *
      * \retval  true    Success
-     * \retval  false   Failure
+     * \retval  false   Failure (state machine not started, empty event queue)
      */
     bool processNextEvent();
+
+    /*!
+     * Adds a new state to the state machine
+     *
+     * \param   stateName   State name
+     * \param   entryMethod State entry method
+     * \param   exitMethod  State exit method
+     *
+     * \retval  true    Success
+     * \retval  false   Failure (state machine already started, empty or duplicate state name)
+     */
+    bool addState(const QString &stateName,
+                  StateEntryMethod entryMethod = {},
+                  StateExitMethod exitMethod = {});
 
     /*!
      * Gets the initial state of the state machine
@@ -195,55 +200,17 @@ public:
     QString initialState() const;
 
     /*!
-     * Sets an existing state as the initial state of the state machine and optionally sets the
-     * state machine entry method that is executed before transitioning to the initial state
+     * Sets an existing state as the initial state of the state machine
      *
-     * \param   stateName               Name of an existing state
-     * \param   stateMachineEntryMethod Optional state machine entry method
+     * \param   stateName   Name of an existing state
      *
      * \retval  true    Success
-     * \retval  false   Failure
+     * \retval  false   Failure (state machine already started, already set, state does not exit)
+     *
+     * \note    If the state has an entry method it shall be executed before transitioning to the
+     *          initial state with an "empty" event (event with no name)
      */
-    bool setInitialState(const QString &stateName,
-                         StateMachineEntryMethod stateMachineEntryMethod = {});
-
-    /*!
-     * Gets the initial state of the state machine
-     *
-     * \return  State name
-     */
-    QString finalState() const;
-
-    /*!
-     * Adds a new state without state to be used as the final state of the state machine and
-     * optionally sets the state machine exit method that is executed after transitioning to the
-     * final state
-     *
-     * \param   stateName               Name of an state
-     * \param   stateMachineExitMethod  Optional state machine exit method
-     *
-     * \retval  true    Success
-     * \retval  false   Failure
-     *
-     * \note    Final state is optional, without it the state machine shall never terminate except
-     *          by stopping the state machine explicitly with stop()
-     */
-    bool setFinalState(const QString &stateName,
-                       StateMachineExitMethod stateMachineExitMethod = {});
-
-    /*!
-     * Adds a new state to the state machine
-     *
-     * \param   stateName           State name
-     * \param   stateEntryMethod    State entry method
-     * \param   stateExitMethod     State exit method
-     *
-     * \retval  true    Success
-     * \retval  false   Failure (invalid operational state, empty or duplicate state name)
-     */
-    bool addState(const QString &stateName,
-                  StateEntryMethod stateEntryMethod = {},
-                  StateExitMethod stateExitMethod = {});
+    bool setInitialState(const QString &stateName);
 
     /*!
      * Adds a new transition between states
@@ -255,8 +222,8 @@ public:
      * \param   actionMethod    Optional transition action method
      *
      * \retval  true    Success
-     * \retval  false   Failure (invalid operational state, invalid state or event names, duplicate
-     *                  transition, transition from the final state)
+     * \retval  false   Failure (state machine already started, invalid state or event names,
+     *                  duplicate transition)
      */
     bool addTransition(const QString &fromState,
                        const QString &eventName,
@@ -321,25 +288,6 @@ private:
      * automatically transition to this state when the state machine is started.
      */
     QString m_initialState;
-
-    /*!
-     * Holds the state machine entry method that is executed before transitioning to the initial
-     * state
-     */
-    StateMachineEntryMethod m_stateMachineEntryMethod;
-
-    /*!
-     * Holds the name of the final state of the state machine. This is a pseudo state and it exist
-     * primarily to have a target to transition to when the state machine gets stopped through an
-     * event.
-     *
-     * \note    As this is not a proper state it is not allowed to have any transitions from it to
-     *          another state!
-     */
-    QString m_finalState;
-
-    //! Holds the state machine exit method that is executed after transitioning to the final state
-    StateMachineExitMethod m_stateMachineExitMethod;
 
     //! Holds the validation status
     ValidationStatus m_validationStatus;

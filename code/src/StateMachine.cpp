@@ -20,7 +20,6 @@
 
 // Own header
 #include <CppStateMachineFramework/StateMachine.hpp>
-#include <utility>
 
 // C++ State Machine Framework includes
 
@@ -36,8 +35,7 @@
 // -------------------------------------------------------------------------------------------------
 
 //! Logging category for the state machine
-static const QLoggingCategory s_stateMachineLoggingCategory(
-        "CppStateMachineFramework.StateMachine");
+static const QLoggingCategory s_loggingCategory("CppStateMachineFramework.StateMachine");
 
 // -------------------------------------------------------------------------------------------------
 
@@ -61,20 +59,19 @@ StateMachine::ValidationStatus StateMachine::validationStatus() const
 
 bool StateMachine::validate()
 {
-    qCDebug(s_stateMachineLoggingCategory) << "Validating the state machine...";
+    qCDebug(s_loggingCategory) << "Validating the state machine...";
 
     // Validation can only be executed if the state machine is stopped
     if (isStarted())
     {
-        qCWarning(s_stateMachineLoggingCategory)
-                << "Validation attempted on a started state machine";
+        qCWarning(s_loggingCategory) << "Validation attempted on a started state machine";
         return false;
     }
 
     // Check if the state machine has at least one state
     if (m_states.isEmpty())
     {
-        qCWarning(s_stateMachineLoggingCategory) << "State machine has no states";
+        qCWarning(s_loggingCategory) << "State machine has no states";
         m_validationStatus = ValidationStatus::Invalid;
         return false;
     }
@@ -82,30 +79,24 @@ bool StateMachine::validate()
     // Check if initial state is set
     if (m_initialState.isEmpty())
     {
-        qCWarning(s_stateMachineLoggingCategory) << "State machine has no initial state";
+        qCWarning(s_loggingCategory) << "State machine has no initial state";
         m_validationStatus = ValidationStatus::Invalid;
         return false;
     }
 
-    // Validate all transitions
+    // Validate final states
     for (auto it_state = m_states.begin(); it_state != m_states.end(); it_state++)
     {
         const QString &stateName = it_state.key();
         const StateData &stateData = it_state.value();
 
-        for (auto it_transition = stateData.transitions.begin();
-             it_transition != stateData.transitions.end();
-             it_transition++)
+        if (stateData.transitions.isEmpty())
         {
-            const QString &eventName = it_transition.key();
-            const TransitionData &transitionData = it_transition.value();
-
-            if (!m_states.contains(transitionData.state))
+            // This is a final state, check if it has an exit method
+            if (stateData.exitMethod)
             {
-                qCWarning(s_stateMachineLoggingCategory)
-                        << QString("Invalid transition from state [%1] with event [%2] to unknown "
-                                   "state [%3]")
-                           .arg(stateName, eventName, transitionData.state);
+                qCWarning(s_loggingCategory)
+                        << "A final state cannot have an exit method:" << stateName;
                 m_validationStatus = ValidationStatus::Invalid;
                 return false;
             }
@@ -121,7 +112,7 @@ bool StateMachine::validate()
 
     if (statesReached != availableStates)
     {
-        qCWarning(s_stateMachineLoggingCategory)
+        qCWarning(s_loggingCategory)
                 << "The following states cannot be reached:" << (availableStates - statesReached);
         m_validationStatus = ValidationStatus::Invalid;
         return false;
@@ -129,7 +120,7 @@ bool StateMachine::validate()
 
     // Validation successful
     m_validationStatus = ValidationStatus::Valid;
-    qCDebug(s_stateMachineLoggingCategory) << "State machine validated successfully";
+    qCDebug(s_loggingCategory) << "State machine validated successfully";
     return true;
 }
 
@@ -144,40 +135,28 @@ bool StateMachine::isStarted()
 
 bool StateMachine::start()
 {
-    qCDebug(s_stateMachineLoggingCategory) << "Starting the state machine...";
+    qCDebug(s_loggingCategory) << "Starting the state machine...";
 
     // State machine can be started only if it is stopped and valid
     if (m_started)
     {
-        qCWarning(s_stateMachineLoggingCategory) << "State machine is already started";
+        qCWarning(s_loggingCategory) << "State machine is already started";
         return false;
     }
 
     if (m_validationStatus != ValidationStatus::Valid)
     {
-        qCWarning(s_stateMachineLoggingCategory)
-                << "State machine can be started only if it is valid";
+        qCWarning(s_loggingCategory) << "State machine can be started only if it is valid";
         return false;
     }
 
-    // Clear all pending events and the current state
+    // Transition to the initial state
     m_eventQueue.clear();
     m_currentState.clear();
-
-    // Call the state machine entry method
-    if (m_stateMachineEntryMethod)
-    {
-        qCDebug(s_stateMachineLoggingCategory) << "Executing entry action...";
-        m_stateMachineEntryMethod();
-        qCDebug(s_stateMachineLoggingCategory) << "Entry action executed";
-    }
-
-    // Transition to the initial state
-    m_currentState = m_initialState;
-    qCDebug(s_stateMachineLoggingCategory) << "Initial state set to:" << m_currentState;
-
     m_started = true;
-    qCDebug(s_stateMachineLoggingCategory) << "State machine started successfully";
+    qCDebug(s_loggingCategory) << "State machine started";
+
+    executeTransition(TransitionData { m_initialState, {}, {} }, Event(QString()));
     return true;
 }
 
@@ -185,21 +164,20 @@ bool StateMachine::start()
 
 bool StateMachine::stop()
 {
-    qCDebug(s_stateMachineLoggingCategory) << "Stopping the state machine...";
+    qCDebug(s_loggingCategory) << "Stopping the state machine...";
 
     // Check if the state machine can be started
     if (!m_started)
     {
-        qCWarning(s_stateMachineLoggingCategory)
-                << "State machine can only be stopped if it is currently started";
+        qCWarning(s_loggingCategory) << "State machine is already stopped";
         return false;
     }
 
     // Stop the state machine
-    qCDebug(s_stateMachineLoggingCategory) << "Current state:" << m_currentState;
+    qCDebug(s_loggingCategory) << "Current state:" << m_currentState;
 
     m_started = false;
-    qCDebug(s_stateMachineLoggingCategory) << "State machine stopped successfully";
+    qCDebug(s_loggingCategory) << "State machine stopped";
     return true;
 }
 
@@ -224,25 +202,25 @@ bool StateMachine::addEvent(std::unique_ptr<Event> event)
     // Check if the event is valid
     if (!event)
     {
-        qCWarning(s_stateMachineLoggingCategory) << "Attempted to add an empty event";
+        qCWarning(s_loggingCategory) << "Attempted to add an empty event";
         return false;
     }
 
     if (event->name().isEmpty())
     {
-        qCWarning(s_stateMachineLoggingCategory) << "Attempted to add an event with an empty name";
+        qCWarning(s_loggingCategory) << "Attempted to add an event with an empty name";
         return false;
     }
 
     // Check if the state machine is started
     if (!m_started)
     {
-        qCWarning(s_stateMachineLoggingCategory)
+        qCWarning(s_loggingCategory)
                 << "Cannot add an event to a stopped state machine:" << event->name();
         return false;
     }
 
-    qCDebug(s_stateMachineLoggingCategory) << "Added event to event queue:" << event->name();
+    qCDebug(s_loggingCategory) << "Added event to event queue:" << event->name();
     m_eventQueue.push_back(std::move(event));
     return true;
 }
@@ -251,34 +229,34 @@ bool StateMachine::addEvent(std::unique_ptr<Event> event)
 
 bool StateMachine::processNextEvent()
 {
-    qCDebug(s_stateMachineLoggingCategory) << "Processing next event...";
+    qCDebug(s_loggingCategory) << "Processing next event...";
 
     // Check if the state machine is started
     if (!m_started)
     {
-        qCWarning(s_stateMachineLoggingCategory) << "State machine is not started";
+        qCWarning(s_loggingCategory) << "State machine is not started";
         return false;
     }
 
     // Check if there are any pending events to process
     if (m_eventQueue.empty())
     {
-        qCWarning(s_stateMachineLoggingCategory) << "No pending events to process!";
+        qCWarning(s_loggingCategory) << "No pending events to process!";
         return false;
     }
 
     // Take the next pending event and check if a state transition needs to be executed
     auto event = std::move(m_eventQueue.front());
     m_eventQueue.pop_front();
-    qCDebug(s_stateMachineLoggingCategory) << "Processing event:" << event->name();
+    qCDebug(s_loggingCategory) << "Processing event:" << event->name();
 
     auto transitions = m_states.value(m_currentState).transitions;
     auto it = transitions.find(event->name());
 
     if (it == transitions.end())
     {
-        qCDebug(s_stateMachineLoggingCategory) << "No transitions for this event, ignore it";
-        return false;
+        qCDebug(s_loggingCategory) << "No transitions for this event, ignore it";
+        return true;
     }
 
     // Transition to the next state
@@ -286,7 +264,42 @@ bool StateMachine::processNextEvent()
 
     executeTransition(transitionData, *event);
 
-    qCDebug(s_stateMachineLoggingCategory) << "Event processed";
+    qCDebug(s_loggingCategory) << "Event processed";
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool StateMachine::addState(const QString &stateName,
+                            StateEntryMethod entryMethod,
+                            StateExitMethod exitMethod)
+{
+    // Check if a state is allowed to be added at this time
+    if (m_started)
+    {
+        qCWarning(s_loggingCategory)
+                << "States can be added to the state machine only when it is stopped";
+        return false;
+    }
+
+    // Check if the state name is valid or duplicate
+    if (stateName.isEmpty())
+    {
+        qCWarning(s_loggingCategory) << "State name cannot be empty!";
+        return false;
+    }
+
+    if (m_states.contains(stateName))
+    {
+        qCWarning(s_loggingCategory) << "A state with the same name already exists:" << stateName;
+        return false;
+    }
+
+    // Add state
+    m_states.insert(stateName, StateData { std::move(entryMethod), std::move(exitMethod), {} });
+    m_validationStatus = ValidationStatus::Unvalidated;
+
+    qCDebug(s_loggingCategory) << "Added a new state:" << stateName;
     return true;
 }
 
@@ -299,13 +312,12 @@ QString StateMachine::initialState() const
 
 // -------------------------------------------------------------------------------------------------
 
-bool StateMachine::setInitialState(const QString &stateName,
-                                   StateMachineEntryMethod stateMachineEntryMethod)
+bool StateMachine::setInitialState(const QString &stateName)
 {
     // Check if the initial state is allowed to be set at this time
     if (m_started)
     {
-        qCWarning(s_stateMachineLoggingCategory)
+        qCWarning(s_loggingCategory)
                 << "Initial state can be set only when the state machine is stopped";
         return false;
     }
@@ -313,125 +325,23 @@ bool StateMachine::setInitialState(const QString &stateName,
     // Check if the initial state is already set
     if (!m_initialState.isEmpty())
     {
-        qCWarning(s_stateMachineLoggingCategory) << "Initial state is already set:" << m_finalState;
+        qCWarning(s_loggingCategory) << "Initial state is already set:" << m_initialState;
         return false;
     }
 
     // Check if state exists
     if (!m_states.contains(stateName))
     {
-        qCWarning(s_stateMachineLoggingCategory)
+        qCWarning(s_loggingCategory)
                 << "Only existing states can be set as the initial state:" << stateName;
-        return false;
-    }
-
-    // Check if initial state is the same as final state
-    if (stateName == m_finalState)
-    {
-        qCWarning(s_stateMachineLoggingCategory)
-                << "Initial state cannot be set to the same state as the final state:" << stateName;
         return false;
     }
 
     // Set initial state
     m_initialState = stateName;
-    m_stateMachineEntryMethod = std::move(stateMachineEntryMethod);
     m_validationStatus = ValidationStatus::Unvalidated;
 
-    qCDebug(s_stateMachineLoggingCategory) << "Set the initial state:" << stateName;
-    return true;
-}
-
-// -------------------------------------------------------------------------------------------------
-
-QString StateMachine::finalState() const
-{
-    return m_finalState;
-}
-
-// -------------------------------------------------------------------------------------------------
-
-bool StateMachine::setFinalState(const QString &stateName,
-                                 StateMachineExitMethod stateMachineExitMethod)
-{
-    // Check if the final state is allowed to be set at this time
-    if (m_started)
-    {
-        qCWarning(s_stateMachineLoggingCategory)
-                << "Final state can be set only when the state machine is stopped";
-        return false;
-    }
-
-    // Check if the final state is already set
-    if (!m_finalState.isEmpty())
-    {
-        qCWarning(s_stateMachineLoggingCategory) << "Final state is already set:" << m_finalState;
-        return false;
-    }
-
-    // Check if final state needs to be disabled
-    if (stateName.isEmpty())
-    {
-        // Disable final state
-        m_finalState.clear();
-        m_validationStatus = ValidationStatus::Unvalidated;
-
-        qCDebug(s_stateMachineLoggingCategory) << "Disabled final state";
-        return true;
-    }
-
-    // Add new state and set it as the final state
-    if (m_states.contains(stateName))
-    {
-        qCWarning(s_stateMachineLoggingCategory)
-                << "A state with the same name already exists:" << stateName;
-        return false;
-    }
-
-    m_states.insert(stateName, StateData {});
-    m_finalState = stateName;
-    m_stateMachineExitMethod = std::move(stateMachineExitMethod);
-    m_validationStatus = ValidationStatus::Unvalidated;
-
-    qCDebug(s_stateMachineLoggingCategory)
-            << "Added a new state and set it as the final state:" << stateName;
-    return true;
-}
-
-// -------------------------------------------------------------------------------------------------
-
-bool StateMachine::addState(const QString &stateName,
-                            StateEntryMethod stateEntryMethod,
-                            StateExitMethod stateExitMethod)
-{
-    // Check if a state is allowed to be added at this time
-    if (m_started)
-    {
-        qCWarning(s_stateMachineLoggingCategory)
-                << "States can be added to the state machine only when it is stopped";
-        return false;
-    }
-
-    // Check if the state name is valid or duplicate
-    if (stateName.isEmpty())
-    {
-        qCWarning(s_stateMachineLoggingCategory) << "State name cannot be empty!";
-        return false;
-    }
-
-    if (m_states.contains(stateName))
-    {
-        qCWarning(s_stateMachineLoggingCategory)
-                << "A state with the same name already exists:" << stateName;
-        return false;
-    }
-
-    // Add state
-    m_states.insert(stateName,
-                    StateData { std::move(stateEntryMethod), std::move(stateExitMethod), {} });
-    m_validationStatus = ValidationStatus::Unvalidated;
-
-    qCDebug(s_stateMachineLoggingCategory) << "Added a new state:" << stateName;
+    qCDebug(s_loggingCategory) << "Set the initial state:" << stateName;
     return true;
 }
 
@@ -446,7 +356,7 @@ bool StateMachine::addTransition(const QString &fromState,
     // Check if a transition is allowed to be added at this time
     if (m_started)
     {
-        qCWarning(s_stateMachineLoggingCategory)
+        qCWarning(s_loggingCategory)
                 << "Transitions can be added to the state machine only when it is stopped";
         return false;
     }
@@ -454,43 +364,32 @@ bool StateMachine::addTransition(const QString &fromState,
     // Check if the state and event names are valid
     if (fromState.isEmpty())
     {
-        qCWarning(s_stateMachineLoggingCategory)
-                << "Name of the state to transition from cannot be empty";
+        qCWarning(s_loggingCategory) << "Name of the state to transition from cannot be empty";
         return false;
     }
 
     if (!m_states.contains(fromState))
     {
-        qCWarning(s_stateMachineLoggingCategory)
-                << "State to transition from does not exist:" << fromState;
-        return false;
-    }
-
-    if (fromState == m_finalState)
-    {
-        qCWarning(s_stateMachineLoggingCategory)
-                << "Cannot transition from final state:" << fromState;
+        qCWarning(s_loggingCategory) << "State to transition from does not exist:" << fromState;
         return false;
     }
 
     if (eventName.isEmpty())
     {
-        qCWarning(s_stateMachineLoggingCategory)
+        qCWarning(s_loggingCategory)
                 << "Name of the event that triggers the transition cannot be empty";
         return false;
     }
 
     if (toState.isEmpty())
     {
-        qCWarning(s_stateMachineLoggingCategory)
-                << "Name of the state to transition to cannot be empty";
+        qCWarning(s_loggingCategory) << "Name of the state to transition to cannot be empty";
         return false;
     }
 
     if (!m_states.contains(toState))
     {
-        qCWarning(s_stateMachineLoggingCategory)
-                << "State to transition to does not exist:" << toState;
+        qCWarning(s_loggingCategory) << "State to transition to does not exist:" << toState;
         return false;
     }
 
@@ -499,7 +398,7 @@ bool StateMachine::addTransition(const QString &fromState,
 
     if (stateData.transitions.contains(eventName))
     {
-        qCWarning(s_stateMachineLoggingCategory)
+        qCWarning(s_loggingCategory)
                 << QString("Transition from state [%1] with event [%2] already exists")
                    .arg(fromState, eventName);
         return false;
@@ -511,7 +410,7 @@ bool StateMachine::addTransition(const QString &fromState,
                 TransitionData { toState, std::move(guardMethod), std::move(actionMethod) });
     m_validationStatus = ValidationStatus::Unvalidated;
 
-    qCDebug(s_stateMachineLoggingCategory)
+    qCDebug(s_loggingCategory)
             << QString("Added a transition from state [%1] with event [%2] to state [%3]")
                .arg(fromState, eventName, toState);
     return true;
@@ -541,15 +440,14 @@ void StateMachine::traverseStates(const QString &stateName, QSet<QString> *state
 
 // -------------------------------------------------------------------------------------------------
 
-void StateMachine::executeTransition(const TransitionData &transitionData,
-                                     const Event &event)
+void StateMachine::executeTransition(const TransitionData &transitionData, const Event &event)
 {
     // Check if the transition is blocked by the guard method
     if (transitionData.guardMethod)
     {
         if (!transitionData.guardMethod(event))
         {
-            qCDebug(s_stateMachineLoggingCategory)
+            qCDebug(s_loggingCategory)
                     << QString("Transition from state [%1] with event [%2] to state [%3] was "
                                "blocked by the guard method")
                        .arg(m_currentState, event.name(), transitionData.state);
@@ -557,41 +455,48 @@ void StateMachine::executeTransition(const TransitionData &transitionData,
         }
     }
 
-    qCDebug(s_stateMachineLoggingCategory)
+    qCDebug(s_loggingCategory)
             << QString("Transitioning from state [%1] with event [%2] to state [%3]...")
                .arg(m_currentState, event.name(), transitionData.state);
+
+    // Execute the exit method of the current state
+    auto &currentStateData = m_states[m_currentState];
+
+    if (currentStateData.exitMethod)
+    {
+        qCDebug(s_loggingCategory) << "Executing exit method...";
+        currentStateData.exitMethod(event);
+        qCDebug(s_loggingCategory) << "Exit method executed";
+    }
 
     // Execute transition's action
     if (transitionData.actionMethod)
     {
-        qCDebug(s_stateMachineLoggingCategory) << "Executing transition's action method...";
+        qCDebug(s_loggingCategory) << "Executing transition's action method...";
         transitionData.actionMethod(event);
-        qCDebug(s_stateMachineLoggingCategory) << "Transition's action method executed";
+        qCDebug(s_loggingCategory) << "Transition's action method executed";
     }
 
     // Transition to the next state
     m_currentState = transitionData.state;
+    qCDebug(s_loggingCategory) << "Transitioned to state:" << m_currentState;
 
-    if (m_currentState != m_finalState)
+    // Execute the entry method of the next state
+    auto &nextStateData = m_states[m_currentState];
+
+    if (nextStateData.entryMethod)
     {
-        // Transitioned to non-final state
-        qCDebug(s_stateMachineLoggingCategory) << "Transitioned to state:" << m_currentState;
-        return;
+        qCDebug(s_loggingCategory) << "Executing entry method...";
+        nextStateData.entryMethod(event);
+        qCDebug(s_loggingCategory) << "Entry method executed";
     }
 
-    // Transitioned to the final state
-    qCDebug(s_stateMachineLoggingCategory) << "Transitioned to the final state:" << m_currentState;
-
-    // Call the exit action
-    if (m_stateMachineExitMethod)
+    // Check if the state machine transitioned to a final state
+    if (nextStateData.transitions.isEmpty())
     {
-        qCDebug(s_stateMachineLoggingCategory) << "Executing exit action...";
-        m_stateMachineExitMethod();
-        qCDebug(s_stateMachineLoggingCategory) << "Exit action executed";
+        qCDebug(s_loggingCategory) << "Transitioned to a final state";
+        stop();
     }
-
-    // Stop state machine
-    stop();
 }
 
 } // namespace CppStateMachineFramework
