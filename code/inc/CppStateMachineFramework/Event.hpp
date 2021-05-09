@@ -96,11 +96,11 @@ public:
      * \param   name    Event name
      * \param   data    Event data
      */
-    EventWithData(const QString &name,
-                  const typename std::enable_if_t<std::is_copy_constructible<T>::value> &data)
+    EventWithData(const QString &name, const T &data)
         : Event(name),
           m_data(data)
     {
+        static_assert(std::is_copy_constructible<T>::value, "Data cannot be copied");
     }
 
     /*!
@@ -109,27 +109,27 @@ public:
      * \param   name    Event name
      * \param   data    Event data
      */
-    EventWithData(const QString &name,
-                  typename std::enable_if_t<std::is_move_constructible<T>::value> &&data)
+    EventWithData(const QString &name, T &&data)
         : Event(name),
           m_data(std::move(data))
     {
+        static_assert(std::is_move_constructible<T>::value, "Data cannot be moved");
     }
 
     //! Copy constructor
-    EventWithData(const EventWithData &) = default;
+    EventWithData(const EventWithData &other) = default;
 
     //! Move constructor
-    EventWithData(EventWithData &&) noexcept = default;
+    EventWithData(EventWithData &&other) noexcept = default;
 
     //! Destructor
     ~EventWithData() override = default;
 
     //! Copy assignment operator
-    EventWithData &operator=(const EventWithData &) = default;
+    EventWithData &operator=(const EventWithData &other) = default;
 
     //! Move assignment operator
-    EventWithData &operator=(EventWithData &&) noexcept = default;
+    EventWithData &operator=(EventWithData &&other) noexcept = default;
 
     //! Gets the event's data
     const T &data() const
@@ -150,10 +150,10 @@ public:
      *
      * \return  Event instance
      */
-    static std::unique_ptr<EventWithData<T>> create(
-            const QString &name,
-            const typename std::enable_if_t<std::is_copy_constructible<T>::value> &data)
+    static std::unique_ptr<EventWithData<T>> create(const QString &name, const T &data)
     {
+        static_assert(std::is_copy_constructible<T>::value, "Data cannot be copied");
+
         return std::make_unique<EventWithData<T>>(name, data);
     }
 
@@ -164,10 +164,10 @@ public:
      *
      * \return  Event instance
      */
-    static std::unique_ptr<EventWithData<T>> create(
-            const QString &name,
-            typename std::enable_if_t<std::is_move_constructible<T>::value> &&data)
+    static std::unique_ptr<EventWithData<T>> create(const QString &name, T &&data)
     {
+        static_assert(std::is_move_constructible<T>::value, "Data cannot be moved");
+
         return std::make_unique<EventWithData<T>>(name, std::move(data));
     }
 
