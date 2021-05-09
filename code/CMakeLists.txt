@@ -25,6 +25,8 @@ find_package(Qt5 COMPONENTS Core REQUIRED)
 option(CppStateMachineFramework_CodeCoverage "C++ State Machine Framework Code Coverage" OFF)
 
 if (CppStateMachineFramework_CodeCoverage MATCHES ON)
+    message("C++ State Machine Framework: Code coverage enabled")
+
     include(cmake/CodeCoverage.cmake)
     APPEND_COVERAGE_COMPILER_FLAGS()
 
@@ -139,6 +141,5 @@ install(
 # --------------------------------------------------------------------------------------------------
 # Tests
 # --------------------------------------------------------------------------------------------------
-# TODO: enable
-#enable_testing()
-#add_subdirectory(tests)
+enable_testing()
+add_subdirectory(tests)
