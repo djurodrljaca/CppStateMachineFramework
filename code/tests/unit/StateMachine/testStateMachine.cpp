@@ -39,6 +39,9 @@ class TestStateMachine : public QObject
 {
     Q_OBJECT
 
+public:
+    TestStateMachine();
+
 private slots:
     // Functions executed by QtTest before and after test suite
     void initTestCase();
@@ -58,7 +61,23 @@ private slots:
     // TODO: test transitions to the same state
     // TODO: test state loops
     // TODO: test state machines with and without final states
+
+private:
+    const StateMachine::StateEntryMethod m_dummyEntryMethod;
+    const StateMachine::StateExitMethod m_dummyExitMethod;
+    const StateMachine::TransitionGuardMethod m_dummyGuardMethod;
+    const StateMachine::TransitionActionMethod m_dummyActionMethod;
 };
+
+// Constructor -------------------------------------------------------------------------------------
+
+TestStateMachine::TestStateMachine()
+    : m_dummyEntryMethod([](const Event &, const QString &, const QString &) {}),
+      m_dummyExitMethod([](const Event &, const QString &, const QString &) {}),
+      m_dummyGuardMethod([](const Event &, const QString &, const QString &) { return true; }),
+      m_dummyActionMethod([](const Event &, const QString &, const QString &) {})
+{
+}
 
 // Test Case init/cleanup methods ------------------------------------------------------------------
 
@@ -164,7 +183,7 @@ void TestStateMachine::testValidation()
     QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
 
     // Add an invalid final state (no transitions from it to other states and an exit method)
-    QVERIFY(stateMachine.addState("c", {}, [](const Event &) {}));
+    QVERIFY(stateMachine.addState("c", {}, m_dummyExitMethod));
 
     QVERIFY(!stateMachine.validate());
     QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Invalid);
@@ -198,6 +217,18 @@ void TestStateMachine::testStartStop()
     QVERIFY(stateMachine.validate());
     QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
 
+    // Try to start the state machine with empty event and with an event that has an empty name
+    QVERIFY(!stateMachine.finalStateReached());
+    QVERIFY(!stateMachine.isStarted());
+    QVERIFY(!stateMachine.start({}));
+    QVERIFY(!stateMachine.isStarted());
+
+    QVERIFY(!stateMachine.finalStateReached());
+    QVERIFY(!stateMachine.isStarted());
+    QVERIFY(!stateMachine.start(Event::create(QString())));
+    QVERIFY(!stateMachine.isStarted());
+
+    // Start the state machine (with the default initialization event)
     QVERIFY(!stateMachine.finalStateReached());
     QVERIFY(!stateMachine.isStarted());
     QVERIFY(stateMachine.start());
@@ -207,6 +238,10 @@ void TestStateMachine::testStartStop()
     QVERIFY(!stateMachine.isStarted());
     QCOMPARE(stateMachine.currentState(), "init");
     QVERIFY(stateMachine.finalStateReached());
+
+    auto event = stateMachine.takeFinalEvent();
+    QVERIFY(event);
+    QCOMPARE(event->name(), "Started");
 
     // Stopping the state machine must fail if it is already stopped but it must not have any effect
     // on the state machine
@@ -225,6 +260,7 @@ void TestStateMachine::testStartStop()
     QVERIFY(stateMachine.isStarted());
     QCOMPARE(stateMachine.currentState(), "init");
     QVERIFY(!stateMachine.finalStateReached());
+    QVERIFY(!stateMachine.takeFinalEvent());
 
     // Starting the state machine must fail if it is already started but it must not have any effect
     // on the state machine
@@ -237,6 +273,7 @@ void TestStateMachine::testStartStop()
     QVERIFY(!stateMachine.isStarted());
     QCOMPARE(stateMachine.currentState(), "init");
     QVERIFY(!stateMachine.finalStateReached());
+    QVERIFY(!stateMachine.takeFinalEvent());
 
     // Stopping the state machine must fail if it is already stopped but it must not have any effect
     // on the state machine
@@ -262,13 +299,15 @@ void TestStateMachine::testAddState()
     QVERIFY(!stateMachine.addState(""));
 
     // Add a state with entry method
-    QVERIFY(stateMachine.addState("b", [](const Event &) {}));
+    QVERIFY(stateMachine.addState("b", [](const Event &, const QString &, const QString &) {}));
 
     // Add a state with exit method
-    QVERIFY(stateMachine.addState("c", {}, [](const Event &) {}));
+    QVERIFY(stateMachine.addState("c", {}, [](const Event &, const QString &, const QString &) {}));
 
     // Add a state with entry and exit method
-    QVERIFY(stateMachine.addState("d", [](const Event &) {}, [](const Event &) {}));
+    QVERIFY(stateMachine.addState("d",
+                                  [](const Event &, const QString &, const QString &) {},
+                                  [](const Event &, const QString &, const QString &) {}));
 
     // Set the initial state and add transitions to make the state machine valid then start it
     QVERIFY(stateMachine.setInitialState("a"));
@@ -342,12 +381,10 @@ void TestStateMachine::testAddTransition()
 
     // Add transitions with and without guard and action methods
     QVERIFY(stateMachine.addTransition("a", "event1", "b"));
-    QVERIFY(stateMachine.addTransition("a", "event2", "b",
-                                       [](const Event &) { return true; }));
-    QVERIFY(stateMachine.addTransition("a", "event3", "b",
-                                       {}, [](const Event &) {}));
+    QVERIFY(stateMachine.addTransition("a", "event2", "b", m_dummyGuardMethod));
+    QVERIFY(stateMachine.addTransition("a", "event3", "b", {}, m_dummyActionMethod));
     QVERIFY(stateMachine.addTransition("a", "event4", "b",
-                                       [](const Event &) { return true; }, [](const Event &) {}));
+                                       m_dummyGuardMethod, m_dummyActionMethod));
 
     // Add duplicate transition
     QVERIFY(stateMachine.addTransition("a", "event", "c"));

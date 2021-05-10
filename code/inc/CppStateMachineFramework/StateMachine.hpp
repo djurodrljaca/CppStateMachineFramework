@@ -25,6 +25,7 @@
 
 // Qt includes
 #include <QtCore/QHash>
+#include <QtCore/QMutex>
 
 // System includes
 #include <deque>
@@ -37,6 +38,8 @@
 
 namespace CppStateMachineFramework
 {
+
+// TODO: add IState interface and addStateObject() as convenience method for addState()
 
 //! This class holds the state machine
 class CPPSTATEMACHINEFRAMEWORK_EXPORT StateMachine
@@ -58,52 +61,68 @@ public:
     /*!
      * Type alias for a state entry method
      *
-     * \param   event   Event that triggered the transition to the state
+     * \param   event       Event that triggered the transition to the state
+     * \param   fromState   Name of the state to transition from
+     * \param   toState     Name of the state to transition to
      */
-    using StateEntryMethod = std::function<void(const Event &event)>;
+    using StateEntryMethod = std::function<void(const Event &event,
+                                                const QString &fromState,
+                                                const QString &toState)>;
 
     /*!
      * Type alias for a state exit method
      *
      * \param   event   Event that triggered the transition from the state
+     * \param   fromState   Name of the state to transition from
+     * \param   toState     Name of the state to transition to
      */
-    using StateExitMethod = std::function<void(const Event &event)>;
+    using StateExitMethod = std::function<void(const Event &event,
+                                               const QString &fromState,
+                                               const QString &toState)>;
 
     /*!
      * Type alias for a transition guard method
      *
-     * \param   event   Event that triggered the transition
+     * \param   event       Event that triggered the transition
+     * \param   fromState   Name of the state to transition from
+     * \param   toState     Name of the state to transition to
      *
      * \retval  true    Transition is allowed
      * \retval  false   Transition is not allowed
      */
-    using TransitionGuardMethod = std::function<bool(const Event &event)>;
+    using TransitionGuardMethod = std::function<bool(const Event &event,
+                                                     const QString &fromState,
+                                                     const QString &toState)>;
 
     /*!
      * Type alias for a transition action method
      *
-     * \param   event   Event that triggered the transition
+     * \param   event       Event that triggered the transition
+     * \param   fromState   Name of the state to transition from
+     * \param   toState     Name of the state to transition to
      */
-    using TransitionActionMethod = std::function<void(const Event &event)>;
+    using TransitionActionMethod = std::function<void(const Event &event,
+                                                      const QString &fromState,
+                                                      const QString &toState)>;
 
 public:
     //! Constructor
     StateMachine();
 
-    //! Copy constructor
-    StateMachine(const StateMachine &) = default;
+    //! Copy constructor is disabled
+    StateMachine(const StateMachine &) = delete;
 
     //! Move constructor
-    StateMachine(StateMachine &&) noexcept = default;
+    StateMachine(StateMachine &&other) noexcept;
 
     //! Destructor
     ~StateMachine() = default;
 
-    //! Copy assignment operator
-    StateMachine &operator=(const StateMachine &) = default;
+    //! Copy assignment operator is disabled
+    StateMachine &operator=(const StateMachine &) = delete;
 
     //! Move assignment operator
-    StateMachine &operator=(StateMachine &&) noexcept = default;
+    StateMachine &operator=(StateMachine &&other) noexcept;
 
     /*!
      * Gets the validation status of the state machine
@@ -132,10 +151,12 @@ public:
     /*!
      * Start the state machine
      *
+     * \param   event   Event that will be sent to the initial state
+     *
      * \retval  true    Success
      * \retval  false   Failure (state machine already started or invalid)
      */
-    bool start();
+    bool start(std::unique_ptr<Event> event = std::make_unique<Event>(QStringLiteral("Started")));
 
     /*!
      * Start the state machine
@@ -159,6 +180,13 @@ public:
      * \retval  false   Final state not reached
      */
     bool finalStateReached();
+
+    /*!
+     * Takes the event which triggered the transition to the final state
+     *
+     * \return  Event or nullptr if final state was not reached
+     */
+    std::unique_ptr<Event> takeFinalEvent();
 
     /*!
      * Checks if the state machine has any pending events
@@ -271,6 +299,18 @@ private:
 
 private:
     /*!
+     * Stops the state machine
+     *
+     * \retval  true    Success
+     * \retval  false   Failure (state machine already stopped)
+     *
+     * \note    The only difference between stopInternal() and stop() is that stopInternal() assumes
+     *          that the mutex is already locked and stop() locks the mutex. This method is needed
+     *          just to be able to stop the state machine after the mutex was locked.
+     */
+    bool stopInternal();
+
+    /*!
      * Traverses from the specified state to all possible states from the configured transitions
      *
      * \param   stateName   Name of the state where the traversal will be started
@@ -279,8 +319,14 @@ private:
      */
     void traverseStates(const QString &stateName, QSet<QString> *statesReached) const;
 
-    //! Transition the state machine to the initial state (only execute during start!)
-    void transitionToInitalState();
+    /*!
+     * Transition the state machine to the initial state
+     *
+     * \param   event   Event
+     *
+     * \note    This method is only executed in start()
+     */
+    void transitionToInitalState(std::unique_ptr<Event> event);
 
     /*!
      * Executes the transition
@@ -288,7 +334,7 @@ private:
      * \param   transitionData  Transition data
      * \param   event           Event that triggered the transition
      */
-    void executeTransition(const TransitionData &transitionData, const Event &event);
+    void executeTransition(const TransitionData &transitionData, std::unique_ptr<Event> event);
 
 private:
     //! Holds all states in the state machine
@@ -311,6 +357,12 @@ private:
 
     //! Holds the queued events
     std::deque<std::unique_ptr<Event>> m_eventQueue;
+
+    //! Holds the event which triggered the transition to the final state
+    std::unique_ptr<Event> m_finalEvent;
+
+    //! Holds the mutex used to make the API thread safe
+    mutable QMutex m_mutex;
 };
 
 } // namespace CppStateMachineFramework
