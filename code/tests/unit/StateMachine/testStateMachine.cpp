@@ -57,10 +57,12 @@ private slots:
     void testAddState();
     void testSetInitialState();
     void testAddTransition();
-    // TODO: test entry, exit, transition guard, and transition action methods
+    void testAddEvent();
+    void testProcessNextEvent();
+    void testStateEntryExitMethods();
+    void testTransitionGuardActionMethods();
     // TODO: test transitions to the same state
     // TODO: test state loops
-    // TODO: test state machines with and without final states
 
 private:
     const StateMachine::StateEntryMethod m_dummyEntryMethod;
@@ -361,7 +363,7 @@ void TestStateMachine::testSetInitialState()
     QCOMPARE(stateMachine.initialState(), "a");
 }
 
-// Test: Constructor -------------------------------------------------------------------------------
+// Test: addTransition() ---------------------------------------------------------------------------
 
 void TestStateMachine::testAddTransition()
 {
@@ -403,6 +405,366 @@ void TestStateMachine::testAddTransition()
 
     // Add a transition while state machine is started
     QVERIFY(!stateMachine.addTransition("a", "event5", "b"));
+}
+
+// Test: addEvent() ---------------------------------------------------------------------------
+
+void TestStateMachine::testAddEvent()
+{
+    // Initialize the state machine
+    StateMachine stateMachine;
+
+    QVERIFY(stateMachine.addState("a"));
+    QVERIFY(stateMachine.addState("b"));
+    QVERIFY(stateMachine.addState("c"));
+
+    QVERIFY(stateMachine.setInitialState("a"));
+
+    QVERIFY(stateMachine.addTransition("a", "a_to_b", "b"));
+    QVERIFY(stateMachine.addTransition("b", "b_to_c", "c"));
+
+    // Try to add an event to an unvalidated state machine
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Unvalidated);
+
+    QVERIFY(!stateMachine.hasPendingEvents());
+    QVERIFY(!stateMachine.addEvent(Event::create("test")));
+    QVERIFY(!stateMachine.hasPendingEvents());
+
+    // Validate the state machine
+    QVERIFY(stateMachine.validate());
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
+
+    // Try to add an event to a stopped state machine
+    QVERIFY(!stateMachine.isStarted());
+
+    QVERIFY(!stateMachine.hasPendingEvents());
+    QVERIFY(!stateMachine.addEvent(Event::create("test")));
+    QVERIFY(!stateMachine.hasPendingEvents());
+
+    // Try to add an empty event to a stopped state machine
+    QVERIFY(!stateMachine.hasPendingEvents());
+    QVERIFY(!stateMachine.addEvent({}));
+    QVERIFY(!stateMachine.hasPendingEvents());
+
+    // Try to add an event with an empty name to a stopped state machine
+    QVERIFY(!stateMachine.hasPendingEvents());
+    QVERIFY(!stateMachine.addEvent(Event::create("")));
+    QVERIFY(!stateMachine.hasPendingEvents());
+
+    // Start the state machine
+    QVERIFY(stateMachine.start());
+    QVERIFY(stateMachine.isStarted());
+
+    // Try to add an empty event to a started state machine
+    QVERIFY(!stateMachine.hasPendingEvents());
+    QVERIFY(!stateMachine.addEvent({}));
+    QVERIFY(!stateMachine.hasPendingEvents());
+
+    // Try to add an event with an empty name to a started state machine
+    QVERIFY(!stateMachine.hasPendingEvents());
+    QVERIFY(!stateMachine.addEvent(Event::create("")));
+    QVERIFY(!stateMachine.hasPendingEvents());
+
+    // Add an event to a started state machine
+    QVERIFY(!stateMachine.hasPendingEvents());
+    QVERIFY(stateMachine.addEvent(Event::create("test")));
+    QVERIFY(stateMachine.hasPendingEvents());
+}
+
+// Test: processNextEvent() ------------------------------------------------------------------------
+
+void TestStateMachine::testProcessNextEvent()
+{
+    // Initialize the state machine
+    StateMachine stateMachine;
+
+    QVERIFY(stateMachine.addState("a"));
+    QVERIFY(stateMachine.addState("b"));
+    QVERIFY(stateMachine.addState("c"));
+
+    QVERIFY(stateMachine.setInitialState("a"));
+
+    QVERIFY(stateMachine.addTransition("a", "a_to_b", "b"));
+    QVERIFY(stateMachine.addTransition("b", "b_to_c", "c"));
+
+    // Try to process an event in an unvalidated state machine
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Unvalidated);
+
+    QVERIFY(!stateMachine.hasPendingEvents());
+    QVERIFY(!stateMachine.processNextEvent());
+    QVERIFY(!stateMachine.hasPendingEvents());
+
+    // Validate the state machine
+    QVERIFY(stateMachine.validate());
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
+
+    // Try to process an event in a stopped state machine
+    QVERIFY(!stateMachine.isStarted());
+
+    QVERIFY(!stateMachine.hasPendingEvents());
+    QVERIFY(!stateMachine.processNextEvent());
+    QVERIFY(!stateMachine.hasPendingEvents());
+
+    // Start the state machine
+    QVERIFY(stateMachine.start());
+    QVERIFY(stateMachine.isStarted());
+    QCOMPARE(stateMachine.currentState(), "a");
+
+    // Try to process an event in a started state machine which has no pending events
+    QVERIFY(!stateMachine.hasPendingEvents());
+    QVERIFY(!stateMachine.processNextEvent());
+    QVERIFY(!stateMachine.hasPendingEvents());
+
+    // Add an unexpected event and process is
+    QVERIFY(stateMachine.addEvent(Event::create("unexpected")));
+    QVERIFY(stateMachine.hasPendingEvents());
+
+    QVERIFY(stateMachine.processNextEvent());
+    QVERIFY(!stateMachine.hasPendingEvents());
+    QCOMPARE(stateMachine.currentState(), "a");
+
+    // Add an expected event and process is
+    QVERIFY(stateMachine.addEvent(Event::create("a_to_b")));
+    QVERIFY(stateMachine.hasPendingEvents());
+
+    QVERIFY(stateMachine.processNextEvent());
+    QVERIFY(!stateMachine.hasPendingEvents());
+    QCOMPARE(stateMachine.currentState(), "b");
+
+    // Restart the state machine and add multiple events
+    QVERIFY(stateMachine.stop());
+    QVERIFY(!stateMachine.isStarted());
+
+    QVERIFY(stateMachine.start());
+    QVERIFY(stateMachine.isStarted());
+    QCOMPARE(stateMachine.currentState(), "a");
+
+    QVERIFY(stateMachine.addEvent(Event::create("unexpected1")));
+    QVERIFY(stateMachine.addEvent(Event::create("a_to_b")));
+    QVERIFY(stateMachine.addEvent(Event::create("unexpected2")));
+    QVERIFY(stateMachine.addEvent(Event::create("b_to_c")));
+
+    // Next processed event ("unexpected1") must be ignored
+    QVERIFY(stateMachine.hasPendingEvents());
+    QVERIFY(stateMachine.processNextEvent());
+    QVERIFY(stateMachine.hasPendingEvents());
+    QCOMPARE(stateMachine.currentState(), "a");
+
+    // Next processed event must make a transition to state "b"
+    QVERIFY(stateMachine.hasPendingEvents());
+    QVERIFY(stateMachine.processNextEvent());
+    QVERIFY(stateMachine.hasPendingEvents());
+    QCOMPARE(stateMachine.currentState(), "b");
+
+    // Next processed event ("unexpected2") must be ignored
+    QVERIFY(stateMachine.hasPendingEvents());
+    QVERIFY(stateMachine.processNextEvent());
+    QVERIFY(stateMachine.hasPendingEvents());
+    QCOMPARE(stateMachine.currentState(), "b");
+
+    // Next (last) processed event must make a transition to state "c" (final state)
+    QVERIFY(stateMachine.hasPendingEvents());
+    QVERIFY(stateMachine.processNextEvent());
+    QVERIFY(!stateMachine.hasPendingEvents());
+    QCOMPARE(stateMachine.currentState(), "c");
+    QVERIFY(stateMachine.finalStateReached());
+
+    auto event = stateMachine.takeFinalEvent();
+    QVERIFY(event);
+    QCOMPARE(event->name(), "b_to_c");
+}
+
+// Test: Execution of state entry and exit methods -------------------------------------------------
+
+void TestStateMachine::testStateEntryExitMethods()
+{
+    bool entryOnInit = false;
+    bool exitFromInit = false;
+
+    bool entryToB = false;
+    bool exitFromB = false;
+
+    bool entryFinalState = false;
+
+    // Initialize and validate the state machine
+    StateMachine stateMachine;
+
+    QVERIFY(stateMachine.addState("a",
+                                  [&](auto &, auto &, auto &) { entryOnInit = true; },
+                                  [&](auto &, auto &, auto &) { exitFromInit = true; }));
+
+    QVERIFY(stateMachine.addState("b",
+                                  [&](auto &, auto &, auto &) { entryToB = true; },
+                                  [&](auto &, auto &, auto &) { exitFromB = true; }));
+
+    QVERIFY(stateMachine.addState("c", [&](auto &, auto &, auto &) { entryFinalState = true; }));
+
+    QVERIFY(stateMachine.setInitialState("a"));
+
+    QVERIFY(stateMachine.addTransition("a", "a_to_b", "b"));
+    QVERIFY(stateMachine.addTransition("b", "b_to_c", "c"));
+
+    QVERIFY(stateMachine.validate());
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
+
+    // Start the state machine (entryOnInit must be set)
+    QVERIFY(!entryOnInit);
+    QVERIFY(!exitFromInit);
+    QVERIFY(!entryToB);
+    QVERIFY(!exitFromB);
+    QVERIFY(!entryFinalState);
+
+    QVERIFY(stateMachine.start());
+    QVERIFY(stateMachine.isStarted());
+
+    QVERIFY(entryOnInit);
+    QVERIFY(!exitFromInit);
+    QVERIFY(!entryToB);
+    QVERIFY(!exitFromB);
+    QVERIFY(!entryFinalState);
+
+    QCOMPARE(stateMachine.currentState(), "a");
+    QVERIFY(!stateMachine.finalStateReached());
+    QVERIFY(!stateMachine.takeFinalEvent());
+
+    entryOnInit = false;
+
+    // Trigger transition from state "a" (initial state) to state "b"
+    QVERIFY(stateMachine.addEvent(Event::create("a_to_b")));
+
+    QVERIFY(!entryOnInit);
+    QVERIFY(!exitFromInit);
+    QVERIFY(!entryToB);
+    QVERIFY(!exitFromB);
+    QVERIFY(!entryFinalState);
+
+    QVERIFY(stateMachine.processNextEvent());
+
+    QVERIFY(!entryOnInit);
+    QVERIFY(exitFromInit);
+    QVERIFY(entryToB);
+    QVERIFY(!exitFromB);
+    QVERIFY(!entryFinalState);
+
+    QCOMPARE(stateMachine.currentState(), "b");
+    QVERIFY(!stateMachine.finalStateReached());
+    QVERIFY(!stateMachine.takeFinalEvent());
+
+    exitFromInit = false;
+    entryToB = false;
+
+    // Trigger transition from state "b" to state "c" (final state)
+    QVERIFY(stateMachine.addEvent(Event::create("b_to_c")));
+
+    QVERIFY(!entryOnInit);
+    QVERIFY(!exitFromInit);
+    QVERIFY(!entryToB);
+    QVERIFY(!exitFromB);
+    QVERIFY(!entryFinalState);
+
+    QVERIFY(stateMachine.processNextEvent());
+
+    QVERIFY(!entryOnInit);
+    QVERIFY(!exitFromInit);
+    QVERIFY(!entryToB);
+    QVERIFY(exitFromB);
+    QVERIFY(entryFinalState);
+
+    QCOMPARE(stateMachine.currentState(), "c");
+    QVERIFY(stateMachine.finalStateReached());
+
+    auto event = stateMachine.takeFinalEvent();
+    QVERIFY(event);
+    QCOMPARE(event->name(), "b_to_c");
+}
+
+// Test: Execution of transition guard and action methods ------------------------------------------
+
+void TestStateMachine::testTransitionGuardActionMethods()
+{
+    bool guardValueAB = false;
+    bool actionExecutedAB = false;
+
+    bool guardValueBC = false;
+    bool actionExecutedBC = false;
+
+    // Initialize and validate the state machine
+    StateMachine stateMachine;
+
+    QVERIFY(stateMachine.addState("a"));
+    QVERIFY(stateMachine.addState("b"));
+    QVERIFY(stateMachine.addState("c"));
+
+    QVERIFY(stateMachine.setInitialState("a"));
+
+    QVERIFY(stateMachine.addTransition("a", "a_to_b", "b",
+                                       [&](auto &, auto &, auto &) { return guardValueAB; },
+                                       [&](auto &, auto &, auto &) { actionExecutedAB = true; }));
+    QVERIFY(stateMachine.addTransition("b", "b_to_c", "c",
+                                       [&](auto &, auto &, auto &) { return guardValueBC; },
+                                       [&](auto &, auto &, auto &) { actionExecutedBC = true; }));
+
+    QVERIFY(stateMachine.validate());
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
+
+    // Start the state machine
+    QVERIFY(stateMachine.start());
+    QVERIFY(stateMachine.isStarted());
+
+    QVERIFY(!actionExecutedAB);
+    QVERIFY(!actionExecutedBC);
+
+    QCOMPARE(stateMachine.currentState(), "a");
+    QVERIFY(!stateMachine.finalStateReached());
+    QVERIFY(!stateMachine.takeFinalEvent());
+
+    // Block transition from "a" to "b" with the guard method
+    QVERIFY(stateMachine.addEvent(Event::create("a_to_b")));
+
+    QVERIFY(!actionExecutedAB);
+    QVERIFY(!actionExecutedBC);
+
+    QVERIFY(stateMachine.processNextEvent());
+
+    QVERIFY(!actionExecutedAB);
+    QVERIFY(!actionExecutedBC);
+
+    // Allow transition from "a" to "b" with the guard method
+    guardValueAB = true;
+    QVERIFY(stateMachine.addEvent(Event::create("a_to_b")));
+
+    QVERIFY(!actionExecutedAB);
+    QVERIFY(!actionExecutedBC);
+
+    QVERIFY(stateMachine.processNextEvent());
+
+    QVERIFY(actionExecutedAB);
+    QVERIFY(!actionExecutedBC);
+
+    actionExecutedAB = false;
+
+    // Block transition from "b" to "c" with the guard method
+    QVERIFY(stateMachine.addEvent(Event::create("b_to_c")));
+
+    QVERIFY(!actionExecutedAB);
+    QVERIFY(!actionExecutedBC);
+
+    QVERIFY(stateMachine.processNextEvent());
+
+    QVERIFY(!actionExecutedAB);
+    QVERIFY(!actionExecutedBC);
+
+    // Allow transition from "b" to "c" with the guard method
+    guardValueBC = true;
+    QVERIFY(stateMachine.addEvent(Event::create("b_to_c")));
+
+    QVERIFY(!actionExecutedAB);
+    QVERIFY(!actionExecutedBC);
+
+    QVERIFY(stateMachine.processNextEvent());
+
+    QVERIFY(!actionExecutedAB);
+    QVERIFY(actionExecutedBC);
 }
 
 // Main function -----------------------------------------------------------------------------------
