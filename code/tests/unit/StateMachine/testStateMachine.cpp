@@ -59,9 +59,7 @@ private slots:
     void testAddTransition();
     void testAddEvent();
     void testProcessNextEvent();
-    void testStateEntryExitMethods();
-    void testTransitionGuardActionMethods();
-    // TODO: test transitions to the same state
+    void testStateAndTransitionMethods();
     // TODO: test state loops
 
 private:
@@ -574,101 +572,224 @@ void TestStateMachine::testProcessNextEvent()
     QCOMPARE(event->name(), "b_to_c");
 }
 
-// Test: Execution of state entry and exit methods -------------------------------------------------
+// Test: Execution of state entry/exit and transition guard/action methods -------------------------
 
-void TestStateMachine::testStateEntryExitMethods()
+void TestStateMachine::testStateAndTransitionMethods()
 {
-    bool entryOnInit = false;
-    bool exitFromInit = false;
+    QStringList log;
+    bool guardValueAB = false;
+    bool guardValueBB = false;
+    bool guardValueBC = false;
 
-    bool entryToB = false;
-    bool exitFromB = false;
+    auto entryA = [&](const Event &event, const QString &fromState, const QString &toState)
+    {
+        log.append(QString("entryA: '%1' --> '%2' --> '%3'").arg(fromState, event.name(), toState));
+    };
+    auto exitA = [&](const Event &event, const QString &fromState, const QString &toState)
+    {
+        log.append(QString("exitA: '%1' --> '%2' --> '%3'").arg(fromState, event.name(), toState));
+    };
 
-    bool entryFinalState = false;
+    auto guardAB = [&](const Event &event, const QString &fromState, const QString &toState)
+    {
+        if (guardValueAB)
+        {
+            log.append(QString("guardAB: '%1' --> '%2' --> '%3': Allowed")
+                       .arg(fromState, event.name(), toState));
+        }
+        else
+        {
+            log.append(QString("guardAB: '%1' --> '%2' --> '%3': Blocked")
+                       .arg(fromState, event.name(), toState));
+        }
+
+        return guardValueAB;
+    };
+    auto actionAB = [&](const Event &event, const QString &fromState, const QString &toState)
+    {
+        log.append(QString("actionAB: '%1' --> '%2' --> '%3'")
+                   .arg(fromState, event.name(), toState));
+    };
+
+    auto entryB = [&](const Event &event, const QString &fromState, const QString &toState)
+    {
+        log.append(QString("entryB: '%1' --> '%2' --> '%3'").arg(fromState, event.name(), toState));
+    };
+    auto exitB = [&](const Event &event, const QString &fromState, const QString &toState)
+    {
+        log.append(QString("exitB: '%1' --> '%2' --> '%3'").arg(fromState, event.name(), toState));
+    };
+
+    auto guardBB = [&](const Event &event, const QString &fromState, const QString &toState)
+    {
+        if (guardValueBB)
+        {
+            log.append(QString("guardBB: '%1' --> '%2' --> '%3': Allowed")
+                       .arg(fromState, event.name(), toState));
+        }
+        else
+        {
+            log.append(QString("guardBB: '%1' --> '%2' --> '%3': Blocked")
+                       .arg(fromState, event.name(), toState));
+        }
+
+        return guardValueBB;
+    };
+    auto actionBB = [&](const Event &event, const QString &fromState, const QString &toState)
+    {
+        log.append(QString("actionBB: '%1' --> '%2' --> '%3'")
+                   .arg(fromState, event.name(), toState));
+    };
+
+    auto guardBC = [&](const Event &event, const QString &fromState, const QString &toState)
+    {
+        if (guardValueBC)
+        {
+            log.append(QString("guardBC: '%1' --> '%2' --> '%3': Allowed")
+                       .arg(fromState, event.name(), toState));
+        }
+        else
+        {
+            log.append(QString("guardBC: '%1' --> '%2' --> '%3': Blocked")
+                       .arg(fromState, event.name(), toState));
+        }
+
+        return guardValueBC;
+    };
+    auto actionBC = [&](const Event &event, const QString &fromState, const QString &toState)
+    {
+        log.append(QString("actionBC: '%1' --> '%2' --> '%3'")
+                   .arg(fromState, event.name(), toState));
+    };
+
+    auto entryC = [&](const Event &event, const QString &fromState, const QString &toState)
+    {
+        log.append(QString("entryC: '%1' --> '%2' --> '%3'").arg(fromState, event.name(), toState));
+    };
 
     // Initialize and validate the state machine
     StateMachine stateMachine;
 
-    QVERIFY(stateMachine.addState("a",
-                                  [&](auto &, auto &, auto &) { entryOnInit = true; },
-                                  [&](auto &, auto &, auto &) { exitFromInit = true; }));
-
-    QVERIFY(stateMachine.addState("b",
-                                  [&](auto &, auto &, auto &) { entryToB = true; },
-                                  [&](auto &, auto &, auto &) { exitFromB = true; }));
-
-    QVERIFY(stateMachine.addState("c", [&](auto &, auto &, auto &) { entryFinalState = true; }));
+    QVERIFY(stateMachine.addState("a", entryA, exitA));
+    QVERIFY(stateMachine.addState("b", entryB, exitB));
+    QVERIFY(stateMachine.addState("c", entryC));
 
     QVERIFY(stateMachine.setInitialState("a"));
 
-    QVERIFY(stateMachine.addTransition("a", "a_to_b", "b"));
-    QVERIFY(stateMachine.addTransition("b", "b_to_c", "c"));
+    QVERIFY(stateMachine.addTransition("a", "a_to_b", "b", guardAB, actionAB));
+    QVERIFY(stateMachine.addTransition("b", "b_to_b", "b", guardBB, actionBB));
+    QVERIFY(stateMachine.addTransition("b", "b_to_c", "c", guardBC, actionBC));
 
     QVERIFY(stateMachine.validate());
     QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
 
-    // Start the state machine (entryOnInit must be set)
-    QVERIFY(!entryOnInit);
-    QVERIFY(!exitFromInit);
-    QVERIFY(!entryToB);
-    QVERIFY(!exitFromB);
-    QVERIFY(!entryFinalState);
+    // Start the state machine
+    QVERIFY(log.isEmpty());
 
     QVERIFY(stateMachine.start());
     QVERIFY(stateMachine.isStarted());
 
-    QVERIFY(entryOnInit);
-    QVERIFY(!exitFromInit);
-    QVERIFY(!entryToB);
-    QVERIFY(!exitFromB);
-    QVERIFY(!entryFinalState);
+    QStringList expectedLog { "entryA: '' --> 'Started' --> 'a'" };
+    QCOMPARE(log, expectedLog);
 
     QCOMPARE(stateMachine.currentState(), "a");
     QVERIFY(!stateMachine.finalStateReached());
     QVERIFY(!stateMachine.takeFinalEvent());
 
-    entryOnInit = false;
+    log.clear();
+    expectedLog.clear();
 
-    // Trigger transition from state "a" (initial state) to state "b"
+    // Block transition from "a" to "b" with the guard method
+    guardValueAB = false;
     QVERIFY(stateMachine.addEvent(Event::create("a_to_b")));
-
-    QVERIFY(!entryOnInit);
-    QVERIFY(!exitFromInit);
-    QVERIFY(!entryToB);
-    QVERIFY(!exitFromB);
-    QVERIFY(!entryFinalState);
-
     QVERIFY(stateMachine.processNextEvent());
 
-    QVERIFY(!entryOnInit);
-    QVERIFY(exitFromInit);
-    QVERIFY(entryToB);
-    QVERIFY(!exitFromB);
-    QVERIFY(!entryFinalState);
+    expectedLog.append("guardAB: 'a' --> 'a_to_b' --> 'b': Blocked");
+    QCOMPARE(log, expectedLog);
+
+    QCOMPARE(stateMachine.currentState(), "a");
+    QVERIFY(!stateMachine.finalStateReached());
+    QVERIFY(!stateMachine.takeFinalEvent());
+
+    log.clear();
+    expectedLog.clear();
+
+    // Trigger transition from state "a" to state "b"
+    guardValueAB = true;
+    QVERIFY(stateMachine.addEvent(Event::create("a_to_b")));
+    QVERIFY(stateMachine.processNextEvent());
+
+    expectedLog.append("guardAB: 'a' --> 'a_to_b' --> 'b': Allowed");
+    expectedLog.append("exitA: 'a' --> 'a_to_b' --> 'b'");
+    expectedLog.append("actionAB: 'a' --> 'a_to_b' --> 'b'");
+    expectedLog.append("entryB: 'a' --> 'a_to_b' --> 'b'");
+    QCOMPARE(log, expectedLog);
 
     QCOMPARE(stateMachine.currentState(), "b");
     QVERIFY(!stateMachine.finalStateReached());
     QVERIFY(!stateMachine.takeFinalEvent());
 
-    exitFromInit = false;
-    entryToB = false;
+    log.clear();
+    expectedLog.clear();
 
-    // Trigger transition from state "b" to state "c" (final state)
-    QVERIFY(stateMachine.addEvent(Event::create("b_to_c")));
-
-    QVERIFY(!entryOnInit);
-    QVERIFY(!exitFromInit);
-    QVERIFY(!entryToB);
-    QVERIFY(!exitFromB);
-    QVERIFY(!entryFinalState);
-
+    // Block transition from "b" to "b" with the guard method
+    guardValueBB = false;
+    QVERIFY(stateMachine.addEvent(Event::create("b_to_b")));
     QVERIFY(stateMachine.processNextEvent());
 
-    QVERIFY(!entryOnInit);
-    QVERIFY(!exitFromInit);
-    QVERIFY(!entryToB);
-    QVERIFY(exitFromB);
-    QVERIFY(entryFinalState);
+    expectedLog.append("guardBB: 'b' --> 'b_to_b' --> 'b': Blocked");
+    QCOMPARE(log, expectedLog);
+
+    QCOMPARE(stateMachine.currentState(), "b");
+    QVERIFY(!stateMachine.finalStateReached());
+    QVERIFY(!stateMachine.takeFinalEvent());
+
+    log.clear();
+    expectedLog.clear();
+
+    // Trigger transition from state "b" to state "b"
+    guardValueBB = true;
+    QVERIFY(stateMachine.addEvent(Event::create("b_to_b")));
+    QVERIFY(stateMachine.processNextEvent());
+
+    expectedLog.append("guardBB: 'b' --> 'b_to_b' --> 'b': Allowed");
+    expectedLog.append("exitB: 'b' --> 'b_to_b' --> 'b'");
+    expectedLog.append("actionBB: 'b' --> 'b_to_b' --> 'b'");
+    expectedLog.append("entryB: 'b' --> 'b_to_b' --> 'b'");
+    QCOMPARE(log, expectedLog);
+
+    QCOMPARE(stateMachine.currentState(), "b");
+    QVERIFY(!stateMachine.finalStateReached());
+    QVERIFY(!stateMachine.takeFinalEvent());
+
+    log.clear();
+    expectedLog.clear();
+
+    // Block transition from "b" to "c" with the guard method
+    guardValueBC = false;
+    QVERIFY(stateMachine.addEvent(Event::create("b_to_c")));
+    QVERIFY(stateMachine.processNextEvent());
+
+    expectedLog.append("guardBC: 'b' --> 'b_to_c' --> 'c': Blocked");
+    QCOMPARE(log, expectedLog);
+
+    QCOMPARE(stateMachine.currentState(), "b");
+    QVERIFY(!stateMachine.finalStateReached());
+    QVERIFY(!stateMachine.takeFinalEvent());
+
+    log.clear();
+    expectedLog.clear();
+
+    // Trigger transition from state "b" to state "c"
+    guardValueBC = true;
+    QVERIFY(stateMachine.addEvent(Event::create("b_to_c")));
+    QVERIFY(stateMachine.processNextEvent());
+
+    expectedLog.append("guardBC: 'b' --> 'b_to_c' --> 'c': Allowed");
+    expectedLog.append("exitB: 'b' --> 'b_to_c' --> 'c'");
+    expectedLog.append("actionBC: 'b' --> 'b_to_c' --> 'c'");
+    expectedLog.append("entryC: 'b' --> 'b_to_c' --> 'c'");
+    QCOMPARE(log, expectedLog);
 
     QCOMPARE(stateMachine.currentState(), "c");
     QVERIFY(stateMachine.finalStateReached());
@@ -676,95 +797,6 @@ void TestStateMachine::testStateEntryExitMethods()
     auto event = stateMachine.takeFinalEvent();
     QVERIFY(event);
     QCOMPARE(event->name(), "b_to_c");
-}
-
-// Test: Execution of transition guard and action methods ------------------------------------------
-
-void TestStateMachine::testTransitionGuardActionMethods()
-{
-    bool guardValueAB = false;
-    bool actionExecutedAB = false;
-
-    bool guardValueBC = false;
-    bool actionExecutedBC = false;
-
-    // Initialize and validate the state machine
-    StateMachine stateMachine;
-
-    QVERIFY(stateMachine.addState("a"));
-    QVERIFY(stateMachine.addState("b"));
-    QVERIFY(stateMachine.addState("c"));
-
-    QVERIFY(stateMachine.setInitialState("a"));
-
-    QVERIFY(stateMachine.addTransition("a", "a_to_b", "b",
-                                       [&](auto &, auto &, auto &) { return guardValueAB; },
-                                       [&](auto &, auto &, auto &) { actionExecutedAB = true; }));
-    QVERIFY(stateMachine.addTransition("b", "b_to_c", "c",
-                                       [&](auto &, auto &, auto &) { return guardValueBC; },
-                                       [&](auto &, auto &, auto &) { actionExecutedBC = true; }));
-
-    QVERIFY(stateMachine.validate());
-    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
-
-    // Start the state machine
-    QVERIFY(stateMachine.start());
-    QVERIFY(stateMachine.isStarted());
-
-    QVERIFY(!actionExecutedAB);
-    QVERIFY(!actionExecutedBC);
-
-    QCOMPARE(stateMachine.currentState(), "a");
-    QVERIFY(!stateMachine.finalStateReached());
-    QVERIFY(!stateMachine.takeFinalEvent());
-
-    // Block transition from "a" to "b" with the guard method
-    QVERIFY(stateMachine.addEvent(Event::create("a_to_b")));
-
-    QVERIFY(!actionExecutedAB);
-    QVERIFY(!actionExecutedBC);
-
-    QVERIFY(stateMachine.processNextEvent());
-
-    QVERIFY(!actionExecutedAB);
-    QVERIFY(!actionExecutedBC);
-
-    // Allow transition from "a" to "b" with the guard method
-    guardValueAB = true;
-    QVERIFY(stateMachine.addEvent(Event::create("a_to_b")));
-
-    QVERIFY(!actionExecutedAB);
-    QVERIFY(!actionExecutedBC);
-
-    QVERIFY(stateMachine.processNextEvent());
-
-    QVERIFY(actionExecutedAB);
-    QVERIFY(!actionExecutedBC);
-
-    actionExecutedAB = false;
-
-    // Block transition from "b" to "c" with the guard method
-    QVERIFY(stateMachine.addEvent(Event::create("b_to_c")));
-
-    QVERIFY(!actionExecutedAB);
-    QVERIFY(!actionExecutedBC);
-
-    QVERIFY(stateMachine.processNextEvent());
-
-    QVERIFY(!actionExecutedAB);
-    QVERIFY(!actionExecutedBC);
-
-    // Allow transition from "b" to "c" with the guard method
-    guardValueBC = true;
-    QVERIFY(stateMachine.addEvent(Event::create("b_to_c")));
-
-    QVERIFY(!actionExecutedAB);
-    QVERIFY(!actionExecutedBC);
-
-    QVERIFY(stateMachine.processNextEvent());
-
-    QVERIFY(!actionExecutedAB);
-    QVERIFY(actionExecutedBC);
 }
 
 // Main function -----------------------------------------------------------------------------------
