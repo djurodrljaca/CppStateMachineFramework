@@ -62,8 +62,8 @@ public:
      * Type alias for a state entry method
      *
      * \param   event       Event that triggered the transition to the state
-     * \param   fromState   Name of the state to transition from
-     * \param   toState     Name of the state to transition to
+     * \param   fromState   Name of the state transitioned from
+     * \param   toState     Name of the state transitioning to
      */
     using StateEntryMethod = std::function<void(const Event &event,
                                                 const QString &fromState,
@@ -72,8 +72,8 @@ public:
     /*!
      * Type alias for a state exit method
      *
-     * \param   event   Event that triggered the transition from the state
-     * \param   fromState   Name of the state to transition from
+     * \param   event       Event that triggered the transition from the state
+     * \param   fromState   Name of the state to transitioning from
      * \param   toState     Name of the state to transition to
      */
     using StateExitMethod = std::function<void(const Event &event,
@@ -84,7 +84,7 @@ public:
      * Type alias for a transition guard method
      *
      * \param   event       Event that triggered the transition
-     * \param   fromState   Name of the state to transition from
+     * \param   fromState   Name of the state to transitioning from
      * \param   toState     Name of the state to transition to
      *
      * \retval  true    Transition is allowed
@@ -98,7 +98,7 @@ public:
      * Type alias for a transition action method
      *
      * \param   event       Event that triggered the transition
-     * \param   fromState   Name of the state to transition from
+     * \param   fromState   Name of the state to transitioning from
      * \param   toState     Name of the state to transition to
      */
     using TransitionActionMethod = std::function<void(const Event &event,

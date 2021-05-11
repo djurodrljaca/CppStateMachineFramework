@@ -67,7 +67,8 @@ public:
     //! Gets the event's name
     QString name() const;
 
-    /*! Creates an instance of an event
+    /*!
+     * Creates an instance of an event
      *
      * \param   name    Event name
      *
@@ -143,7 +144,8 @@ public:
         return m_data;
     }
 
-    /*! Creates an instance of an event
+    /*!
+     * Creates an instance of an event
      *
      * \param   name    Event name
      * \param   data    Event data
@@ -157,7 +159,8 @@ public:
         return std::make_unique<EventWithData<T>>(name, data);
     }
 
-    /*! Creates an instance of an event
+    /*!
+     * Creates an instance of an event
      *
      * \param   name    Event name
      * \param   data    Event data
