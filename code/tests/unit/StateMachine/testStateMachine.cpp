@@ -35,6 +35,49 @@
 
 using namespace CppStateMachineFramework;
 
+class StateObject : public IState
+{
+public:
+    StateObject(const QString &name, QStringList &log)
+        : m_name(name),
+          m_log(log)
+    {
+    }
+
+    StateObject(const StateObject &) = delete;
+    StateObject(StateObject &&) = delete;
+
+    ~StateObject() override = default;
+
+    StateObject &operator=(const StateObject &) = delete;
+    StateObject &operator=(StateObject &&) = delete;
+
+    QString stateName() const override
+    {
+        return m_name;
+    }
+
+    void stateEntryMethod(const Event &event,
+                          const QString &fromState,
+                          const QString &toState) override
+    {
+        m_log.append(QString("stateEntryMethod: '%1' --> '%2' --> '%3'")
+                     .arg(fromState, event.name(), toState));
+    }
+
+    void stateExitMethod(const Event &event,
+                         const QString &fromState,
+                         const QString &toState) override
+   {
+       m_log.append(QString("stateExitMethod: '%1' --> '%2' --> '%3'")
+                    .arg(fromState, event.name(), toState));
+   }
+
+private:
+    QString m_name;
+    QStringList &m_log;
+};
+
 class TestStateMachine : public QObject
 {
     Q_OBJECT
@@ -57,6 +100,7 @@ private slots:
     void testValidate();
     void testStartStop();
     void testAddState();
+    void testAddStateFromObject();
     void testSetInitialState();
     void testAddTransition();
     void testAddEvent();
@@ -450,6 +494,62 @@ void TestStateMachine::testAddState()
 
     // Add a state while state machine is started
     QVERIFY(!stateMachine.addState("e"));
+}
+
+// Test: addState(IState) --------------------------------------------------------------------------
+
+void TestStateMachine::testAddStateFromObject()
+{
+    QStringList log;
+    StateMachine stateMachine;
+
+    // Add state objects
+    StateObject stateA("a", log);
+    StateObject stateB("b", log);
+    StateObject stateC("c", log);
+
+    QVERIFY(stateMachine.addState(stateA));
+    QVERIFY(stateMachine.addState(stateB));
+    QVERIFY(stateMachine.addState("c"));
+
+    // Set the initial state and add transitions to make the state machine valid then start it
+    QVERIFY(stateMachine.setInitialState("a"));
+
+    QVERIFY(stateMachine.addTransition("a", "a_to_b", "b"));
+    QVERIFY(stateMachine.addTransition("b", "b_to_c", "c"));
+
+    QVERIFY(stateMachine.validate());
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
+
+    QVERIFY(stateMachine.start());
+    QVERIFY(stateMachine.isStarted());
+
+    // Add events to transition the state machine to the final state
+    const QStringList expectedLog
+    {
+        "stateEntryMethod: '' --> 'Started' --> 'a'",
+
+        "stateExitMethod: 'a' --> 'a_to_b' --> 'b'",
+        "stateEntryMethod: 'a' --> 'a_to_b' --> 'b'",
+
+        "stateExitMethod: 'b' --> 'b_to_c' --> 'c'",
+    };
+
+    QVERIFY(stateMachine.addEvent(Event::create("a_to_b")));
+    QVERIFY(stateMachine.addEvent(Event::create("b_to_c")));
+
+    QVERIFY(stateMachine.hasPendingEvents());
+    QVERIFY(stateMachine.processNextEvent());
+
+    QVERIFY(stateMachine.hasPendingEvents());
+    QVERIFY(stateMachine.processNextEvent());
+
+    QVERIFY(!stateMachine.hasPendingEvents());
+    QCOMPARE(stateMachine.currentState(), "c");
+    QVERIFY(stateMachine.finalStateReached());
+    QVERIFY(!stateMachine.isStarted());
+
+    QCOMPARE(log, expectedLog);
 }
 
 // Test: setInitialState() -------------------------------------------------------------------------

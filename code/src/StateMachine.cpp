@@ -381,6 +381,21 @@ bool StateMachine::addState(const QString &stateName,
 
 // -------------------------------------------------------------------------------------------------
 
+bool StateMachine::addState(IState &stateObject)
+{
+    return addState(stateObject.stateName(),
+                    [&](const Event &event, const QString &fromState, const QString &toState)
+                    {
+                        stateObject.stateEntryMethod(event, fromState, toState);
+                    },
+                    [&](const Event &event, const QString &fromState, const QString &toState)
+                    {
+                        stateObject.stateExitMethod(event, fromState, toState);
+                    });
+}
+
+// -------------------------------------------------------------------------------------------------
+
 QString StateMachine::initialState() const
 {
     QMutexLocker locker(&m_mutex);

@@ -21,7 +21,7 @@
 #pragma once
 
 // C++ State Machine Framework includes
-#include <CppStateMachineFramework/Event.hpp>
+#include <CppStateMachineFramework/IState.hpp>
 
 // Qt includes
 #include <QtCore/QHash>
@@ -38,8 +38,6 @@
 
 namespace CppStateMachineFramework
 {
-
-// TODO: add IState interface and addStateObject() as convenience method for addState()
 
 //! This class holds the state machine
 class CPPSTATEMACHINEFRAMEWORK_EXPORT StateMachine
@@ -227,6 +225,27 @@ public:
     bool addState(const QString &stateName,
                   StateEntryMethod entryMethod = {},
                   StateExitMethod exitMethod = {});
+
+    /*!
+     * A convenience method for adding a new state to the state machine from a state object
+     *
+     * \param   stateObject     State object
+     *
+     * \retval  true    Success
+     * \retval  false   Failure (state machine already started, empty or duplicate state name)
+     *
+     * This method represents an alternative way to add a state to the state machine. The state name
+     * and the state entry and exit methods are taken from the interface and used to add a new state
+     * to the state machine.
+     *
+     * \note    Both entry and exit methods will be created for the added state even if the state
+     *          object's entry and exit methods do nothing. This could represent a very small
+     *          performance penalty as otherwise these methods could have been nullptr.
+     *
+     * \note    Because this method always creates the exit method for the state, this method cannot
+     *          be used to add final states!
+     */
+    bool addState(IState &stateObject);
 
     /*!
      * Gets the initial state of the state machine
