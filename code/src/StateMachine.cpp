@@ -535,7 +535,7 @@ void StateMachine::transitionToInitalState(std::unique_ptr<Event> event)
     if (stateData.entryMethod)
     {
         qCDebug(s_loggingCategory) << "Executing entry method...";
-        stateData.entryMethod(*event, QString(), m_currentState);
+        stateData.entryMethod(*event, QString(), m_initialState);
         qCDebug(s_loggingCategory) << "Entry method executed";
     }
 
