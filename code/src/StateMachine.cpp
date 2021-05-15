@@ -83,7 +83,7 @@ StateMachine &StateMachine::operator=(StateMachine &&other) noexcept
 
 StateMachine::ValidationStatus StateMachine::validationStatus() const
 {
-    QMutexLocker locker(&m_mutex);
+    QMutexLocker locker(&m_apiMutex);
 
     return m_validationStatus;
 }
@@ -92,12 +92,12 @@ StateMachine::ValidationStatus StateMachine::validationStatus() const
 
 bool StateMachine::validate()
 {
-    QMutexLocker locker(&m_mutex);
+    QMutexLocker locker(&m_apiMutex);
 
     qCDebug(s_loggingCategory) << "Validating the state machine...";
 
     // Validation can only be executed if the state machine is stopped
-    if (m_started)
+    if (isStarted())
     {
         qCWarning(s_loggingCategory) << "Validation attempted on a started state machine";
         return false;
@@ -163,7 +163,7 @@ bool StateMachine::validate()
 
 bool StateMachine::isStarted()
 {
-    QMutexLocker locker(&m_mutex);
+    QMutexLocker locker(&m_startedMutex);
 
     return m_started;
 }
@@ -172,7 +172,7 @@ bool StateMachine::isStarted()
 
 bool StateMachine::start(std::unique_ptr<Event> event)
 {
-    QMutexLocker locker(&m_mutex);
+    QMutexLocker apiLocker(&m_apiMutex);
 
     qCDebug(s_loggingCategory) << "Starting the state machine...";
 
@@ -190,6 +190,8 @@ bool StateMachine::start(std::unique_ptr<Event> event)
     }
 
     // State machine can be started only if it is stopped and valid
+    QMutexLocker startedLocker(&m_startedMutex);
+
     if (m_started)
     {
         qCWarning(s_loggingCategory) << "State machine is already started";
@@ -203,11 +205,17 @@ bool StateMachine::start(std::unique_ptr<Event> event)
     }
 
     // Transition to the initial state
+    QMutexLocker eventQueueLocker(&m_eventQueueMutex);
+
     m_eventQueue.clear();
     m_currentState.clear();
     m_finalEvent.reset();
     m_started = true;
+
     qCDebug(s_loggingCategory) << "State machine started";
+
+    eventQueueLocker.unlock();
+    startedLocker.unlock();
 
     transitionToInitalState(std::move(event));
     return true;
@@ -217,7 +225,7 @@ bool StateMachine::start(std::unique_ptr<Event> event)
 
 bool StateMachine::stop()
 {
-    QMutexLocker locker(&m_mutex);
+    QMutexLocker locker(&m_apiMutex);
 
     return stopInternal();
 }
@@ -226,7 +234,7 @@ bool StateMachine::stop()
 
 QString StateMachine::currentState() const
 {
-    QMutexLocker locker(&m_mutex);
+    QMutexLocker locker(&m_apiMutex);
 
     return m_currentState;
 }
@@ -235,7 +243,7 @@ QString StateMachine::currentState() const
 
 bool StateMachine::finalStateReached()
 {
-    QMutexLocker locker(&m_mutex);
+    QMutexLocker locker(&m_apiMutex);
 
     // Check if the current state is set to a valid state
     if (!m_states.contains(m_currentState))
@@ -251,7 +259,7 @@ bool StateMachine::finalStateReached()
 
 std::unique_ptr<Event> StateMachine::takeFinalEvent()
 {
-    QMutexLocker locker(&m_mutex);
+    QMutexLocker locker(&m_apiMutex);
 
     return std::move(m_finalEvent);
 }
@@ -260,7 +268,7 @@ std::unique_ptr<Event> StateMachine::takeFinalEvent()
 
 bool StateMachine::hasPendingEvents() const
 {
-    QMutexLocker locker(&m_mutex);
+    QMutexLocker locker(&m_eventQueueMutex);
 
     return (!m_eventQueue.empty());
 }
@@ -269,7 +277,8 @@ bool StateMachine::hasPendingEvents() const
 
 bool StateMachine::addEvent(std::unique_ptr<Event> event)
 {
-    QMutexLocker locker(&m_mutex);
+    QMutexLocker eventQueueLocker(&m_eventQueueMutex);
+    QMutexLocker startedLocker(&m_startedMutex);
 
     // Check if the event is valid
     if (!event)
@@ -301,18 +310,20 @@ bool StateMachine::addEvent(std::unique_ptr<Event> event)
 
 bool StateMachine::processNextEvent()
 {
-    QMutexLocker locker(&m_mutex);
+    QMutexLocker apiLocker(&m_apiMutex);
 
     qCDebug(s_loggingCategory) << "Processing next event...";
 
     // Check if the state machine is started
-    if (!m_started)
+    if (!isStarted())
     {
         qCWarning(s_loggingCategory) << "State machine is not started";
         return false;
     }
 
     // Check if there are any pending events to process
+    QMutexLocker eventQueuelocker(&m_eventQueueMutex);
+
     if (m_eventQueue.empty())
     {
         qCWarning(s_loggingCategory) << "No pending events to process!";
@@ -323,6 +334,8 @@ bool StateMachine::processNextEvent()
     auto event = std::move(m_eventQueue.front());
     m_eventQueue.pop_front();
     qCDebug(s_loggingCategory) << "Processing event:" << event->name();
+
+    eventQueuelocker.unlock();
 
     auto transitions = m_states.value(m_currentState).transitions;
     auto it = transitions.find(event->name());
@@ -348,10 +361,10 @@ bool StateMachine::addState(const QString &stateName,
                             StateEntryMethod entryMethod,
                             StateExitMethod exitMethod)
 {
-    QMutexLocker locker(&m_mutex);
+    QMutexLocker locker(&m_apiMutex);
 
     // Check if a state is allowed to be added at this time
-    if (m_started)
+    if (isStarted())
     {
         qCWarning(s_loggingCategory)
                 << "States can be added to the state machine only when it is stopped";
@@ -398,7 +411,7 @@ bool StateMachine::addState(IState &stateObject)
 
 QString StateMachine::initialState() const
 {
-    QMutexLocker locker(&m_mutex);
+    QMutexLocker locker(&m_apiMutex);
 
     return m_initialState;
 }
@@ -407,7 +420,7 @@ QString StateMachine::initialState() const
 
 bool StateMachine::setInitialState(const QString &stateName)
 {
-    QMutexLocker locker(&m_mutex);
+    QMutexLocker locker(&m_apiMutex);
 
     // Check if the initial state is already set
     if (!m_initialState.isEmpty())
@@ -440,10 +453,10 @@ bool StateMachine::addTransition(const QString &fromState,
                                  TransitionGuardMethod guardMethod,
                                  TransitionActionMethod actionMethod)
 {
-    QMutexLocker locker(&m_mutex);
+    QMutexLocker locker(&m_apiMutex);
 
     // Check if a transition is allowed to be added at this time
-    if (m_started)
+    if (isStarted())
     {
         qCWarning(s_loggingCategory)
                 << "Transitions can be added to the state machine only when it is stopped";
@@ -497,6 +510,8 @@ bool StateMachine::addTransition(const QString &fromState,
 
 bool StateMachine::stopInternal()
 {
+    QMutexLocker locker(&m_startedMutex);
+
     qCDebug(s_loggingCategory) << "Stopping the state machine...";
 
     // Check if the state machine can be started

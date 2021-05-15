@@ -107,6 +107,7 @@ private slots:
     void testProcessNextEvent();
     void testStateAndTransitionMethods();
     void testStateMachineWithLoop();
+    void testAddEventFromAction();
 
 private:
     const StateMachine::StateEntryMethod m_dummyEntryMethod;
@@ -1070,6 +1071,48 @@ void TestStateMachine::testStateMachineWithLoop()
     QVERIFY(!stateMachine.isStarted());
 
     QCOMPARE(log, expectedLog);
+}
+
+// Test: Adding of tests during execution of an action ---------------------------------------------
+
+void TestStateMachine::testAddEventFromAction()
+{
+    // Initialize and validate the state machine
+    StateMachine stateMachine;
+
+    QVERIFY(stateMachine.addState("a", [&](auto &, auto &, auto &)
+    {
+        stateMachine.addEvent(Event::create("a_to_b"));
+    }));
+    QVERIFY(stateMachine.addState("b", [&](auto &, auto &, auto &)
+    {
+        stateMachine.addEvent(Event::create("b_to_c"));
+    }));
+    QVERIFY(stateMachine.addState("c"));
+
+    QVERIFY(stateMachine.setInitialState("a"));
+
+    QVERIFY(stateMachine.addTransition("a", "a_to_b", "b"));
+    QVERIFY(stateMachine.addTransition("b", "b_to_c", "c"));
+
+    QVERIFY(stateMachine.validate());
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
+
+    // Start the state machine
+    QVERIFY(!stateMachine.hasPendingEvents());
+    QVERIFY(stateMachine.start());
+    QVERIFY(stateMachine.isStarted());
+    QCOMPARE(stateMachine.currentState(), "a");
+
+    // Entry to state "a" should have added an event to transition to "b"
+    QVERIFY(stateMachine.hasPendingEvents());
+    QVERIFY(stateMachine.processNextEvent());
+    QCOMPARE(stateMachine.currentState(), "b");
+
+    // Entry to state "b" should have added an event to transition to "c"
+    QVERIFY(stateMachine.hasPendingEvents());
+    QVERIFY(stateMachine.processNextEvent());
+    QCOMPARE(stateMachine.currentState(), "c");
 }
 
 // Main function -----------------------------------------------------------------------------------

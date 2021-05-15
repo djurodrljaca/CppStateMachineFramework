@@ -371,17 +371,23 @@ private:
     //! Holds the started flag
     bool m_started;
 
+    //! Holds the mutex used to make access to the started flag thread safe
+    mutable QMutex m_startedMutex;
+
     //! Holds the name of the current state of the state machine
     QString m_currentState;
 
     //! Holds the queued events
     std::deque<std::unique_ptr<Event>> m_eventQueue;
 
+    //! Holds the mutex used to make access to the event queue thread safe
+    mutable QMutex m_eventQueueMutex;
+
     //! Holds the event which triggered the transition to the final state
     std::unique_ptr<Event> m_finalEvent;
 
     //! Holds the mutex used to make the API thread safe
-    mutable QMutex m_mutex;
+    mutable QMutex m_apiMutex;
 };
 
 } // namespace CppStateMachineFramework
