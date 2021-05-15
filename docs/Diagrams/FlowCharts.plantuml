@@ -1,0 +1,37 @@
+@startuml StateTransition
+start
+
+-> Event received;
+
+if (State has transition for this event?) then (no)
+     stop
+else (yes)
+endif
+
+if (Transition has guard condition?) then (yes)
+     if (Guard condition satisfied?) then (no)
+          stop
+     else (yes)
+     endif
+else (no)
+endif
+
+if (Current state has exit action?) then (yes)
+     :Execute current state's exit action;
+else (no)
+endif
+
+if (Transition has action?) then (yes)
+     :Execute transition's action;
+else (no)
+endif
+
+if (Next state has entry action?) then (yes)
+     :Execute next state's entry action;
+else (no)
+endif
+
+:Set next state as current state;
+
+stop
+@enduml
