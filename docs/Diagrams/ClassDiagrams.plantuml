@@ -1,0 +1,100 @@
+@startuml StateMachine
+StateMachine *-- "1..*" State
+StateMachine *-- InitialTransition
+StateMachine *-- "0..*" Event
+
+State *-- "0..*" StateTransition
+State *-- "0..*" InternalTransition
+State *-- DefaultStateTransition
+State *-- DefaultInternalTransition
+
+Event *-- EventParameter
+
+class StateMachine {
+    -states
+    -initialTransition
+    -validationStatus
+    -started
+    -currentState
+    -eventQueue
+    -finalEvent
+
+    +validationStatus()
+    +validate()
+    +isStarted()
+    +start(event)
+    +stop()
+    +currentState()
+    +finalStateReached()
+    +hasFinalEvent()
+    +takeFinalEvent()
+    +hasPendingEvents()
+    +addEventToFront(event)
+    +addEventToBack(event)
+    +processNextEvent()
+    +addState(name, entryAction, exitAction)
+    +initialState()
+    +setInitialTransition(initialState, action)
+    +addStateTransition(fromState, trigger, toState, guard, action)
+    +addInternalTransition(state, trigger, guard, action)
+    +setDefaultTransition(fromState, trigger, toState, guard, action)
+    +setDefaultTransition(state, trigger, guard, action)
+    -traverseStates(state, statesReached)
+    -executeInitialTransition(event)
+    -executeStateTransition(transitionData, event)
+    -executeInternalTransition(transitionData, event)
+    -executeDefaultStateTransition(transitionData, event)
+    -executeDefaultInternalTransition(transitionData, event)
+}
+
+class State {
+    +name
+    +entryAction
+    +exitAction
+    +stateTransitions
+    +internalTransitions
+    +defaultStateTransition
+    +defaultInternalTransition
+}
+
+class InitialTransition {
+    +state
+    +action
+}
+
+class StateTransition {
+    +trigger
+    +state
+    +guard
+    +action
+}
+
+class InternalTransition {
+    +trigger
+    +guard
+    +action
+}
+
+class DefaultStateTransition {
+    +state
+    +guard
+    +action
+}
+
+class DefaultInternalTransition {
+    +guard
+    +action
+}
+
+class Event {
+    -name
+    -parameter
+
+    +name()
+    +hasParameter()
+    +parameter()
+}
+
+interface EventParameter {
+}
+@enduml
