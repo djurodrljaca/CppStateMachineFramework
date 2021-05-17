@@ -107,7 +107,30 @@ The validation shall be done as soon as it makes sense:
 
 ## Event processing
 
-TODO
+It shall be possible to add events to the state machine's event queue, either to the front (next
+pending event) or the back (last pending event), but only if the state machine is started. It shall
+be possible to query if there is at least one pending event in the event queue.
+
+The events shall not be processed immediately, event processing shall need to be triggered
+explicitly by the user of the state machine.
+
+Events shall be processed one at a time by taking the next pending event from the event queue and
+using it to trigger a transition if possible. The event is available and passed to all guard
+conditions and transition and state actions that are executed during the complete transition
+workflow.
+
+The startup procedure (initial transition) and event processing (state transitions) shall be the
+only ways to change the state of the state machine.
+
+Events shall be processed using the following workflows:
+
+![Transition workflow](Diagrams/FlowCharts/TransitionWorkflow.svg "Transition workflow")
+
+![Internal transition workflow](Diagrams/FlowCharts/InternalTransitionWorkflow.svg "Internal transition workflow")
+
+![State transition workflow](Diagrams/FlowCharts/StateTransitionWorkflow.svg "State transition workflow")
+
+![Default transition workflow](Diagrams/FlowCharts/DefaultTransitionWorkflow.svg "Default transition workflow")
 
 
 ## Startup procedure

@@ -35,7 +35,7 @@ possible to:
 ## [R1.3] Processing of events
 
 Processing of events shall be triggered by the user of the state machine. Events shall be processed
-one at a time and in the same order as they were added to the event queue (i.e. run-to-completion
+one at a time and in the same order as they are in the event queue (i.e. run-to-completion
 execution model).
 
 The reason for this requirement is to prevent processing of an event while another event is still
@@ -81,7 +81,24 @@ executed:
 * name of the next state
 
 
-## [R2.3] State transition
+## [R2.3] Transitions
+
+There shall be two types of transitions:
+
+* state
+* internal
+
+A state shall have zero or more state and/or internal transitions, but it shall not be possible to
+trigger both types of transition with the same event.
+
+It shall be possible for a state to also have a single default transition of one or the other type.
+
+Workflow for executing transitions:
+
+![Transition workflow](Diagrams/FlowCharts/TransitionWorkflow.svg "Transition workflow")
+
+
+## [R2.3.1] State transition
 
 A state transition shall have the following properties:
 
@@ -98,10 +115,12 @@ If a state transitions back to itself than that is considered to be a self-trans
 state's exit and entry actions. If execution of these actions is not wanted than an internal
 transition should be used instead.
 
-![State transition](Diagrams/FlowCharts/StateTransition.svg "State transition")
+Workflow for executing state transitions:
+
+![State transition workflow](Diagrams/FlowCharts/StateTransitionWorkflow.svg "State transition workflow")
 
 
-## [R2.3.1] State transition's guard condition
+## [R2.3.1.1] State transition's guard condition
 
 A state transition's guard condition shall have the following context when executed:
 
@@ -112,7 +131,7 @@ A state transition's guard condition shall have the following context when execu
 The result of executing a guard condition shall be whether the condition was satisfied or not.
 
 
-## [R2.3.2] State transition's action
+## [R2.3.1.2] State transition's action
 
 A state transition's action shall have the following context when executed:
 
@@ -121,7 +140,7 @@ A state transition's action shall have the following context when executed:
 * name of the next state
 
 
-## [R2.4] Internal transition
+## [R2.3.2] Internal transition
 
 An internal transition shall have the following properties:
 
@@ -132,8 +151,12 @@ An internal transition shall have the following properties:
 An internal transition shall be executed on a specific event but only if its guard condition is
 satisfied. In that case the transition's action shall be executed.
 
+Workflow for executing internal transitions:
 
-## [R2.4.1] Internal transition's guard condition
+![Internal transition workflow](Diagrams/FlowCharts/InternalTransitionWorkflow.svg "Internal transition workflow")
+
+
+## [R2.3.2.1] Internal transition's guard condition
 
 A internal transition's guard condition shall have the following context when executed:
 
@@ -143,7 +166,7 @@ A internal transition's guard condition shall have the following context when ex
 The result of executing a guard condition shall be whether the condition was satisfied or not.
 
 
-## [R2.4.2] Internal transition's action
+## [R2.3.2.2] Internal transition's action
 
 A internal transition's action shall have the following context when executed:
 
@@ -151,13 +174,16 @@ A internal transition's action shall have the following context when executed:
 * name of the current state
 
 
-## [R2.5] Default transition
+## [R2.3.3] Default transition
 
 It shall be possible to set a default transition that shall be executed only in case the event that
-is being processes does not trigger any of the state and internal transitions.
+is being processes does not trigger any of the state and internal transitions. The default
+transition shall not be executed if a state or internal transition is triggered but blocked by its
+guard condition.
 
-The default transition shall be either a state transition or an internal transition, but it shall
-not be possible to set both.
+Workflow for executing default transitions:
+
+![Default transition workflow](Diagrams/FlowCharts/DefaultTransitionWorkflow.svg "Default transition workflow")
 
 
 ## [R3] Initial state machine state

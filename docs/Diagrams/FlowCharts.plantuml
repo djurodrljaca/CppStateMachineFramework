@@ -1,12 +1,26 @@
-@startuml StateTransition
+@startuml TransitionWorkflow
 start
 
 -> Event received;
 
-if (State has transition for this event?) then (no)
-     stop
-else (yes)
+if (Internal transition triggered?) then (yes)
+     :Execute internal transition;
+elseif (State transition triggered?) then (yes)
+     :Execute state transition;
+elseif (State has a default transition?) then (yes)
+     :Execute default transition;
+else (no)
 endif
+
+stop
+@enduml
+
+'---------------------------------------------------------------------------------------------------
+
+@startuml StateTransitionWorkflow
+start
+
+-> State transition triggered;
 
 if (Transition has guard condition?) then (yes)
      if (Guard condition satisfied?) then (no)
@@ -32,6 +46,46 @@ else (no)
 endif
 
 :Set next state as current state;
+
+stop
+@enduml
+
+'---------------------------------------------------------------------------------------------------
+
+@startuml InternalTransitionWorkflow
+start
+
+-> Internal transition triggered;
+
+if (Transition has guard condition?) then (yes)
+     if (Guard condition satisfied?) then (no)
+          stop
+     else (yes)
+     endif
+else (no)
+endif
+
+:Execute transition's action;
+
+stop
+@enduml
+
+'---------------------------------------------------------------------------------------------------
+
+@startuml DefaultTransitionWorkflow
+start
+
+-> Default transition triggered;
+
+if (Transition has guard condition?) then (yes)
+     if (Guard condition satisfied?) then (no)
+          stop
+     else (yes)
+     endif
+else (no)
+endif
+
+:Execute transition's action;
 
 stop
 @enduml
