@@ -229,14 +229,20 @@ The validation procedure shall validate that:
 ## [R7] Startup procedure
 
 To start the state machine the user shall have to provide an initial event so that it can be used to
-execute the initial transition (to the initial state).
+execute the initial transition to the initial state.
 
 As with any other state the entry action of the initial state shall be executed on startup with the
 provided startup event.
 
+Workflow for executing the initial transition:
+
+![Initial transition workflow](Diagrams/FlowCharts/InitialTransitionWorkflow.svg "Initial transition workflow")
+
 
 ## [R8] Shutdown procedure
 
-The user shall be able to stop the state machine at any time
+The user shall be able to stop the state machine at any time.
 
-The state machine shall also be shutdown automatically on entering one of the final states.
+The state machine shall also be shutdown automatically on entering one of the final states:
+
+![Final transition workflow](Diagrams/FlowCharts/FinalTransitionWorkflow.svg "Final transition workflow")

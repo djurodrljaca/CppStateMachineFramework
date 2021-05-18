@@ -89,3 +89,62 @@ endif
 
 stop
 @enduml
+
+'---------------------------------------------------------------------------------------------------
+
+@startuml InitialTransitionWorkflow
+start
+
+-> State machine started;
+
+if (Initial transition has action?) then (yes)
+     :Execute initial transition's action;
+else (no)
+endif
+
+if (Initial state has entry action?) then (yes)
+     :Execute initial state's entry action;
+else (no)
+endif
+
+:Set initial state as current state;
+
+stop
+@enduml
+
+'---------------------------------------------------------------------------------------------------
+
+@startuml FinalTransitionWorkflow
+start
+
+-> Transition to a final state triggered;
+
+if (Transition has guard condition?) then (yes)
+     if (Guard condition satisfied?) then (no)
+          stop
+     else (yes)
+     endif
+else (no)
+endif
+
+if (Current state has exit action?) then (yes)
+     :Execute current state's exit action;
+else (no)
+endif
+
+if (Transition has action?) then (yes)
+     :Execute transition's action;
+else (no)
+endif
+
+if (Final state has entry action?) then (yes)
+     :Execute final state's entry action;
+else (no)
+endif
+
+:Set final state as current state;
+
+-> State machine stopped;
+
+stop
+@enduml

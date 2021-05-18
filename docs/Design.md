@@ -75,7 +75,9 @@ internal transitions.
 ### Final states
 
 If a state has no state, internal, nor default transitions it shall be treated as a final state. A
-final state can have an entry action, but not an exit action.
+final state can have an entry action, but not an exit action. The state machine shall be stopped on
+entry to a final state and the event that triggered the transition shall be stored and exposed to
+the user of the state machine.
 
 It shall be possible to have zero or more final states in a state machine.
 
@@ -135,9 +137,23 @@ Events shall be processed using the following workflows:
 
 ## Startup procedure
 
-TODO
+For a user to start the state machine they shall have to pass it an event that shall be used for the
+initial transition.
+
+On start the state machine shall clear/reset its operational status (for example the event queue,
+current state, final event) and execute the initial transition as shown in this workflow:
+
+![Initial transition workflow](Diagrams/FlowCharts/InitialTransitionWorkflow.svg "Initial transition workflow")
 
 
 ## Shutdown procedure
 
-TODO
+A user shall be able to stop a stated state machine at any time except when it's processing an
+event.
+
+On shutdown the state machine shall keep the operation status as it is, but it shall no longer allow
+adding new events to the event queue and processing existing events.
+
+The state machine shall also be shutdown automatically on entering one of the final states:
+
+![Final transition workflow](Diagrams/FlowCharts/FinalTransitionWorkflow.svg "Final transition workflow")
