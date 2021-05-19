@@ -38,6 +38,16 @@
 namespace CppStateMachineFramework
 {
 
+//! This is an interface for an event parameter
+class CPPSTATEMACHINEFRAMEWORK_EXPORT IEventParameter
+{
+public:
+    //! Destructor
+    virtual ~IEventParameter() = default;
+};
+
+// -------------------------------------------------------------------------------------------------
+
 //! This class holds the event
 class CPPSTATEMACHINEFRAMEWORK_EXPORT Event
 {
@@ -49,8 +59,16 @@ public:
      */
     Event(const QString &name);
 
-    //! Copy constructor
-    Event(const Event &) = default;
+    /*!
+     * Constructor
+     *
+     * \param   name        Event name
+     * \param   parameter   Event parameter
+     */
+    Event(const QString &name, std::unique_ptr<IEventParameter> parameter);
+
+    //! Copy constructor is disabled
+    Event(const Event &) = delete;
 
     //! Move constructor
     Event(Event &&) noexcept = default;
@@ -58,8 +76,8 @@ public:
     //! Destructor
     virtual ~Event() = default;
 
-    //! Copy assignment operator
-    Event &operator=(const Event &) = default;
+    //! Copy assignment operator is disabled
+    Event &operator=(const Event &) = delete;
 
     //! Move assignment operator
     Event &operator=(Event &&) noexcept = default;
@@ -68,115 +86,139 @@ public:
     QString name() const;
 
     /*!
-     * Creates an instance of an event
+     * Checks if the event has a parameter
      *
-     * \param   name    Event name
-     *
-     * \return  Event instance
+     * \retval  true    Event has a parameter
+     * \retval  false   Event does not have a parameter
      */
-    static std::unique_ptr<Event> create(const QString &name);
+    bool hasParameter() const;
+
+    //! Gets the event's parameter
+    const IEventParameter *parameter() const;
+
+    //! Gets the event's parameter
+    template<typename T>
+    const T *parameter() const
+    {
+        static_assert(std::is_base_of<IEventParameter, T>::value,
+                      "T must be derived from IEventParameter");
+
+        return dynamic_cast<const T*>(m_parameter.get());
+    }
+
+    //! Gets the event's parameter
+    IEventParameter *parameter();
+
+    //! Gets the event's parameter
+    template<typename T>
+    T *parameter()
+    {
+        static_assert(std::is_base_of<IEventParameter, T>::value,
+                      "T must be derived from IEventParameter");
+
+        return dynamic_cast<T*>(m_parameter.get());
+    }
 
 private:
     //! Event's name
     QString m_name;
+
+    //! Event's name
+    std::unique_ptr<IEventParameter> m_parameter;
 };
 
 // -------------------------------------------------------------------------------------------------
 
-/*! This class holds the event with data
+/*! This class holds the event parameter value
  *
- * \tparam  T   Data type of the event's data
+ * \tparam  T   Data type of the event parameter's value
  */
 template<typename T>
-class EventWithData : public Event
+class EventParameter : public IEventParameter
 {
 public:
     /*!
      * Constructor
      *
-     * \param   name    Event name
-     * \param   data    Event data
+     * \param   value   Event parameter's value
      */
-    EventWithData(const QString &name, const T &data)
-        : Event(name),
-          m_data(data)
+    EventParameter(const T &value)
+        : IEventParameter(),
+          m_value(value)
     {
-        static_assert(std::is_copy_constructible<T>::value, "Data cannot be copied");
+        static_assert(std::is_copy_constructible<T>::value, "Value cannot be copied");
     }
 
     /*!
      * Constructor
      *
-     * \param   name    Event name
-     * \param   data    Event data
+     * \param   value   Event parameter's value
      */
-    EventWithData(const QString &name, T &&data)
-        : Event(name),
-          m_data(std::move(data))
+    EventParameter(T &&value)
+        : IEventParameter(),
+          m_value(std::move(value))
     {
-        static_assert(std::is_move_constructible<T>::value, "Data cannot be moved");
+        static_assert(std::is_move_constructible<T>::value, "Value cannot be moved");
     }
 
     //! Copy constructor
-    EventWithData(const EventWithData &other) = default;
+    EventParameter(const EventParameter &other) = default;
 
     //! Move constructor
-    EventWithData(EventWithData &&other) noexcept = default;
+    EventParameter(EventParameter &&other) noexcept = default;
 
     //! Destructor
-    ~EventWithData() override = default;
+    ~EventParameter() override = default;
 
     //! Copy assignment operator
-    EventWithData &operator=(const EventWithData &other) = default;
+    EventParameter &operator=(const EventParameter &other) = default;
 
     //! Move assignment operator
-    EventWithData &operator=(EventWithData &&other) noexcept = default;
+    EventParameter &operator=(EventParameter &&other) noexcept = default;
 
     //! Gets the event's data
-    const T &data() const
+    const T &value() const
     {
-        return m_data;
+        return m_value;
     }
 
-    //! Gets the event's data
-    T &data()
+    //! Gets the event parameter's value
+    T &value()
     {
-        return m_data;
+        return m_value;
     }
 
     /*!
-     * Creates an instance of an event
+     * Creates an instance of an event parameter
      *
-     * \param   name    Event name
-     * \param   data    Event data
+     * \param   value   Event parameter's value
      *
-     * \return  Event instance
+     * \return  Event parameter instance
      */
-    static std::unique_ptr<EventWithData<T>> create(const QString &name, const T &data)
+    static std::unique_ptr<EventParameter<T>> create(const T &value)
     {
-        static_assert(std::is_copy_constructible<T>::value, "Data cannot be copied");
+        static_assert(std::is_copy_constructible<T>::value, "Value cannot be copied");
 
-        return std::make_unique<EventWithData<T>>(name, data);
+        return std::make_unique<EventParameter<T>>(value);
     }
 
     /*!
-     * Creates an instance of an event
+     * Creates an instance of an event parameter
      *
-     * \param   name    Event name
-     * \param   data    Event data
+     * \param   value   Event parameter's value
      *
-     * \return  Event instance
+     * \return  Event parameter instance
      */
-    static std::unique_ptr<EventWithData<T>> create(const QString &name, T &&data)
+    static std::unique_ptr<EventParameter<T>> create(T &&value)
     {
-        static_assert(std::is_move_constructible<T>::value, "Data cannot be moved");
+        static_assert(std::is_move_constructible<T>::value, "Value cannot be moved");
 
-        return std::make_unique<EventWithData<T>>(name, std::move(data));
+        return std::make_unique<EventParameter<T>>(std::move(value));
     }
 
 private:
-    //! Event's data
-    T m_data;
+    //! Holds the value
+    T m_value;
 };
 
 } // namespace CppStateMachineFramework

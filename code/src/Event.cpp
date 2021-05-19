@@ -37,7 +37,16 @@ namespace CppStateMachineFramework
 {
 
 Event::Event(const QString &name)
-    : m_name(name)
+    : m_name(name),
+      m_parameter()
+{
+}
+
+// -------------------------------------------------------------------------------------------------
+
+Event::Event(const QString &name, std::unique_ptr<IEventParameter> parameter)
+    : m_name(name),
+      m_parameter(std::move(parameter))
 {
 }
 
@@ -50,9 +59,23 @@ QString Event::name() const
 
 // -------------------------------------------------------------------------------------------------
 
-std::unique_ptr<Event> Event::create(const QString &name)
+bool Event::hasParameter() const
 {
-    return std::make_unique<Event>(name);
+    return (m_parameter != nullptr);
+}
+
+// -------------------------------------------------------------------------------------------------
+
+const IEventParameter *Event::parameter() const
+{
+    return m_parameter.get();
+}
+
+// -------------------------------------------------------------------------------------------------
+
+IEventParameter *Event::parameter()
+{
+    return m_parameter.get();
 }
 
 } // namespace CppStateMachineFramework

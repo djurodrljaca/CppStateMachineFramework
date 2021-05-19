@@ -35,6 +35,18 @@
 
 using namespace CppStateMachineFramework;
 
+static const QString s_name1("test1");
+static const QString s_name2("test2");
+
+using IntEventParameter = EventParameter<int>;
+static const int s_intValue1 = 1;
+static const int s_intValue2 = 2;
+
+using StringEventParameter = EventParameter<QString>;
+static const QString s_stringValue("value");
+
+using PtrEventParameter = EventParameter<std::unique_ptr<int>>;
+
 class TestEvent : public QObject
 {
     Q_OBJECT
@@ -50,9 +62,8 @@ private slots:
 
     // Test functions
     void testConstructor();
-    void testCopy();
     void testMove();
-    void testCreate();
+    void testEventParameter();
 };
 
 // Test Case init/cleanup methods ------------------------------------------------------------------
@@ -79,55 +90,84 @@ void TestEvent::cleanup()
 
 void TestEvent::testConstructor()
 {
-    const QString name("test");
+    Event event1(s_name1);
+    Event event2(s_name2, IntEventParameter::create(123));
 
-    QCOMPARE(Event(name).name(), name);
-}
+    QCOMPARE(event1.name(), s_name1);
+    QCOMPARE(event2.name(), s_name2);
 
-// Test: Copy constructor and copy assignment operator ---------------------------------------------
+    QVERIFY(!event1.hasParameter());
+    QVERIFY(event2.hasParameter());
 
-void TestEvent::testCopy()
-{
-    const QString name1("test1");
-    const QString name2("test2");
+    QVERIFY(qAsConst(event1).parameter() == nullptr);
+    QVERIFY(event1.parameter() == nullptr);
+    QVERIFY(event1.parameter<StringEventParameter>() == nullptr);
 
-    // Copy constructor
-    const Event source1(name1);
-    Event event(source1);
-    QCOMPARE(event.name(), name1);
+    const auto *param2 = event2.parameter<IntEventParameter>();
+    QVERIFY(param2 != nullptr);
+    QCOMPARE(param2->value(), 123);
 
-    // Copy assignment operator
-    const Event source2(name2);
-    event = source2;
-    QCOMPARE(event.name(), name2);
+    QVERIFY(qAsConst(event2).parameter() != nullptr);
+    QVERIFY(event2.parameter() != nullptr);
+    QVERIFY(event2.parameter<StringEventParameter>() == nullptr);
 }
 
 // Test: Move constructor and move assignment operator ---------------------------------------------
 
 void TestEvent::testMove()
 {
-    const QString name1("test1");
-    const QString name2("test2");
-
     // Move constructor
-    Event event((Event(name1)));
-    QCOMPARE(event.name(), name1);
+    Event moved1((Event(s_name1)));
+    QCOMPARE(moved1.name(), s_name1);
+    QVERIFY(!moved1.hasParameter());
+
+    Event moved2((Event(s_name2, IntEventParameter::create(s_intValue2))));
+    QCOMPARE(moved2.name(), s_name2);
+    QVERIFY(moved2.hasParameter());
+
+    const auto *param2 = moved2.parameter<IntEventParameter>();
+    QVERIFY(param2 != nullptr);
+    QCOMPARE(param2->value(), s_intValue2);
 
     // Move assignment operator
-    event = Event(name2);
-    QCOMPARE(event.name(), name2);
+    moved1 = Event(s_name2, IntEventParameter::create(s_intValue1));
+    QCOMPARE(moved1.name(), s_name2);
+    QVERIFY(moved1.hasParameter());
+
+    const auto *param1 = moved1.parameter<IntEventParameter>();
+    QVERIFY(param1 != nullptr);
+    QCOMPARE(param1->value(), s_intValue1);
+
+    moved2 = Event(s_name1);
+    QCOMPARE(moved2.name(), s_name1);
+    QVERIFY(!moved2.hasParameter());
 }
 
-// Test: create() method ---------------------------------------------------------------------------
+// Test: Events with parameters --------------------------------------------------------------------
 
-void TestEvent::testCreate()
+void TestEvent::testEventParameter()
 {
-    const QString name("test");
+    // Integer
+    Event intEvent(s_name1, IntEventParameter::create(s_intValue1));
+    QCOMPARE(intEvent.name(), s_name1);
+    QVERIFY(intEvent.hasParameter());
+    QVERIFY(intEvent.parameter<IntEventParameter>() != nullptr);
+    QCOMPARE(intEvent.parameter<IntEventParameter>()->value(), s_intValue1);
 
-    const std::unique_ptr<Event> event = Event::create(name);
+    // String
+    Event stringEvent(s_name1, StringEventParameter::create(s_stringValue));
+    QCOMPARE(stringEvent.name(), s_name1);
+    QVERIFY(stringEvent.hasParameter());
+    QVERIFY(stringEvent.parameter<StringEventParameter>() != nullptr);
+    QCOMPARE(stringEvent.parameter<StringEventParameter>()->value(), s_stringValue);
 
-    QVERIFY(event);
-    QCOMPARE(event->name(), name);
+    // Unique pointer
+    Event ptrEvent(s_name1, PtrEventParameter::create(std::make_unique<int>(s_intValue1)));
+    QCOMPARE(ptrEvent.name(), s_name1);
+    QVERIFY(ptrEvent.hasParameter());
+    QVERIFY(ptrEvent.parameter<PtrEventParameter>() != nullptr);
+    QVERIFY(ptrEvent.parameter<PtrEventParameter>()->value().get() != nullptr);
+    QCOMPARE(*(ptrEvent.parameter<PtrEventParameter>()->value()), s_intValue1);
 }
 
 // Main function -----------------------------------------------------------------------------------
