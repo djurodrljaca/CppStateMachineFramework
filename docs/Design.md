@@ -8,6 +8,8 @@ The state machine shall be divided into the following segments:
 * Startup procedure
 * Shutdown procedure
 
+Class diagram for the state machine framework:
+
 ![State machine](Diagrams/ClassDiagrams/StateMachine.svg "State machine")
 
 
@@ -45,6 +47,18 @@ A valid state machine shall need to have its initial transition set. The initial
 need to know to which state to transition to during startup and optionally it shall be possible to
 set an action for the transition.
 
+Workflow for executing the initial transitions:
+
+![Initial transition workflow](Diagrams/FlowCharts/InitialTransitionWorkflow.svg "Initial transition workflow")
+
+
+#### Initial transition's action
+
+The initial transition's action shall have the following context when executed:
+
+* event that triggered the transition
+* name of the initial state
+
 
 ### State transitions
 
@@ -55,6 +69,30 @@ It shall be possible to add state transitions to a state. A state transition sha
 * a guard condition (optional)
 * an action (optional)
 
+Workflow for executing state transitions:
+
+![State transition workflow](Diagrams/FlowCharts/StateTransitionWorkflow.svg "State transition workflow")
+
+
+#### State transition's guard condition
+
+A state transition's guard condition shall have the following context when executed:
+
+* event that triggered the transition
+* name of the current state
+* name of the next state
+
+The result of executing a guard condition shall be whether the condition was satisfied or not.
+
+
+#### State transition's action
+
+A state transition's action shall have the following context when executed:
+
+* event that triggered the transition
+* name of the current state
+* name of the next state
+
 
 ### Internal transitions
 
@@ -64,12 +102,37 @@ It shall be possible to add internal transitions to a state. An internal transit
 * a guard condition (optional)
 * an action
 
+Workflow for executing internal transitions:
+
+![Internal transition workflow](Diagrams/FlowCharts/InternalTransitionWorkflow.svg "Internal transition workflow")
+
+
+#### Internal transition's guard condition
+
+An internal transition's guard condition shall have the following context when executed:
+
+* event that triggered the transition
+* name of the current state
+
+The result of executing a guard condition shall be whether the condition was satisfied or not.
+
+
+#### Internal transition's action
+
+An internal transition's action shall have the following context when executed:
+
+* event that triggered the transition
+* name of the current state
+
 
 ### Default transition
 
 It shall be possible to set a single state or internal transition (but not both!) that shall be
 executed only in case the event that is being processes does not trigger any of the state and
 internal transitions.
+
+Workflow for executing default transitions shall be the same as with its non-default counterpart (an
+ordinary state or internal transition).
 
 
 ### Final states
@@ -88,7 +151,7 @@ A state machine shall be valid if:
 
 * it has at least one state
 * the initial transition is set
-* all state transitions reference existing states
+* all transitions reference existing states
 * all internal transitions have actions
 * all state and internal transitions have a valid trigger (non-empty event name)
 * at most one of the default transitions (state or internal) is set in each state
@@ -127,12 +190,6 @@ only ways to change the state of the state machine.
 Events shall be processed using the following workflows:
 
 ![Transition workflow](Diagrams/FlowCharts/TransitionWorkflow.svg "Transition workflow")
-
-![Internal transition workflow](Diagrams/FlowCharts/InternalTransitionWorkflow.svg "Internal transition workflow")
-
-![State transition workflow](Diagrams/FlowCharts/StateTransitionWorkflow.svg "State transition workflow")
-
-![Default transition workflow](Diagrams/FlowCharts/DefaultTransitionWorkflow.svg "Default transition workflow")
 
 
 ## Startup procedure

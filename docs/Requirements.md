@@ -158,7 +158,7 @@ Workflow for executing internal transitions:
 
 ## [R2.3.2.1] Internal transition's guard condition
 
-A internal transition's guard condition shall have the following context when executed:
+An internal transition's guard condition shall have the following context when executed:
 
 * event that triggered the transition
 * name of the current state
@@ -168,7 +168,7 @@ The result of executing a guard condition shall be whether the condition was sat
 
 ## [R2.3.2.2] Internal transition's action
 
-A internal transition's action shall have the following context when executed:
+An internal transition's action shall have the following context when executed:
 
 * event that triggered the transition
 * name of the current state
@@ -181,9 +181,8 @@ is being processes does not trigger any of the state and internal transitions. T
 transition shall not be executed if a state or internal transition is triggered but blocked by its
 guard condition.
 
-Workflow for executing default transitions:
-
-![Default transition workflow](Diagrams/FlowCharts/DefaultTransitionWorkflow.svg "Default transition workflow")
+Workflow for executing default transitions shall be the same as with its non-default counterpart (an
+ordinary state or internal transition).
 
 
 ## [R3] Initial state machine state
@@ -199,6 +198,11 @@ On startup the state machine transitions to the initial state with the specific 
 the user when the state machine was started.
 
 It shall be possible to set an action to be executed during this transition.
+
+The initial transition's action shall have the following context when executed:
+
+* event that triggered the transition
+* name of the initial state
 
 
 ## [R5] Final state machine state

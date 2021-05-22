@@ -72,26 +72,6 @@ stop
 
 '---------------------------------------------------------------------------------------------------
 
-@startuml DefaultTransitionWorkflow
-start
-
--> Default transition triggered;
-
-if (Transition has guard condition?) then (yes)
-     if (Guard condition satisfied?) then (no)
-          stop
-     else (yes)
-     endif
-else (no)
-endif
-
-:Execute transition's action;
-
-stop
-@enduml
-
-'---------------------------------------------------------------------------------------------------
-
 @startuml InitialTransitionWorkflow
 start
 
