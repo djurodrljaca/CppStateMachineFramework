@@ -65,7 +65,7 @@ public:
      * \param   name        Event name
      * \param   parameter   Event parameter
      */
-    Event(const QString &name, std::unique_ptr<IEventParameter> parameter);
+    Event(const QString &name, std::unique_ptr<IEventParameter> &&parameter);
 
     //! Copy constructor is disabled
     Event(const Event &) = delete;
@@ -83,7 +83,7 @@ public:
     Event &operator=(Event &&) noexcept = default;
 
     //! Gets the event's name
-    QString name() const;
+    const QString &name() const;
 
     /*!
      * Checks if the event has a parameter

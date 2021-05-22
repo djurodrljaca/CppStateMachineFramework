@@ -21,14 +21,15 @@
 #pragma once
 
 // C++ State Machine Framework includes
-#include <CppStateMachineFramework/IState.hpp>
+#include <CppStateMachineFramework/Event.hpp>
 
 // Qt includes
-#include <QtCore/QHash>
+#include <QtCore/qhashfunctions.h>
 #include <QtCore/QMutex>
 
 // System includes
 #include <deque>
+#include <unordered_map>
 
 // Forward declarations
 
@@ -57,51 +58,81 @@ public:
     };
 
     /*!
-     * Type alias for a state entry method
+     * Type alias for a state entry action method
      *
-     * \param   event       Event that triggered the transition to the state
-     * \param   fromState   Name of the state transitioned from
-     * \param   toState     Name of the state transitioning to
+     * \param   trigger         Event that triggered the transition to the state
+     * \param   currentState    Name of the current state
+     * \param   previousState   Name of the previous state
      */
-    using StateEntryMethod = std::function<void(const Event &event,
-                                                const QString &fromState,
-                                                const QString &toState)>;
+    using StateEntryAction = std::function<void(const Event &trigger,
+                                                const QString &currentState,
+                                                const QString &previousState)>;
 
     /*!
-     * Type alias for a state exit method
+     * Type alias for a state exit action method
      *
-     * \param   event       Event that triggered the transition from the state
-     * \param   fromState   Name of the state to transitioning from
-     * \param   toState     Name of the state to transition to
+     * \param   trigger         Event that triggered the transition from the state
+     * \param   currentState    Name of the current state
+     * \param   nextState       Name of the next state
      */
-    using StateExitMethod = std::function<void(const Event &event,
-                                               const QString &fromState,
-                                               const QString &toState)>;
+    using StateExitAction = std::function<void(const Event &trigger,
+                                               const QString &currentState,
+                                               const QString &nextState)>;
 
     /*!
-     * Type alias for a transition guard method
+     * Type alias for a state transition guard condition method
      *
-     * \param   event       Event that triggered the transition
-     * \param   fromState   Name of the state to transitioning from
-     * \param   toState     Name of the state to transition to
+     * \param   trigger         Event that triggered the transition
+     * \param   currentState    Name of the current state
+     * \param   nextState       Name of the next state
      *
      * \retval  true    Transition is allowed
      * \retval  false   Transition is not allowed
      */
-    using TransitionGuardMethod = std::function<bool(const Event &event,
-                                                     const QString &fromState,
-                                                     const QString &toState)>;
+    using StateTransitionGuardCondition = std::function<bool(const Event &trigger,
+                                                             const QString &currentState,
+                                                             const QString &nextState)>;
 
     /*!
-     * Type alias for a transition action method
+     * Type alias for a state transition action method
      *
-     * \param   event       Event that triggered the transition
-     * \param   fromState   Name of the state to transitioning from
-     * \param   toState     Name of the state to transition to
+     * \param   trigger     Event that triggered the transition
+     * \param   currentState    Name of the current state
+     * \param   nextState       Name of the next state
      */
-    using TransitionActionMethod = std::function<void(const Event &event,
-                                                      const QString &fromState,
-                                                      const QString &toState)>;
+    using StateTransitionAction = std::function<void(const Event &trigger,
+                                                     const QString &currentState,
+                                                     const QString &nextState)>;
+
+    /*!
+     * Type alias for an internal transition guard condition method
+     *
+     * \param   trigger         Event that triggered the transition
+     * \param   currentState    Name of the current state
+     *
+     * \retval  true    Transition is allowed
+     * \retval  false   Transition is not allowed
+     */
+    using InternalTransitionGuardCondition = std::function<bool(const Event &trigger,
+                                                                const QString &currentState)>;
+
+    /*!
+     * Type alias for an internal transition action method
+     *
+     * \param   trigger         Event that triggered the transition
+     * \param   currentState    Name of the current state
+     */
+    using InternalTransitionAction = std::function<void(const Event &trigger,
+                                                        const QString &currentState)>;
+
+    /*!
+     * Type alias for an initial transition action method
+     *
+     * \param   trigger         Event that triggered the transition
+     * \param   initialState    Name of the initial state
+     */
+    using InitialTransitionAction = std::function<void(const Event &trigger,
+                                                       const QString &initialState)>;
 
 public:
     //! Constructor
@@ -149,12 +180,24 @@ public:
     /*!
      * Start the state machine
      *
-     * \param   event   Event that will be sent to the initial state
+     * \param   event   Startup event to use in the initial transition
      *
      * \retval  true    Success
      * \retval  false   Failure (state machine already started or invalid)
      */
-    bool start(std::unique_ptr<Event> event = std::make_unique<Event>(QStringLiteral("Started")));
+    bool start(Event &&event);
+
+    /*!
+     * Start the state machine
+     *
+     * \param   eventName       Name of the startup event to use in the initial transition
+     * \param   eventParameter  Event parameter for the startup event
+     *
+     * \retval  true    Success
+     * \retval  false   Failure (state machine already started or invalid)
+     */
+    bool start(const QString &eventName = QStringLiteral("Started"),
+               std::unique_ptr<IEventParameter> &&eventParameter = {});
 
     /*!
      * Start the state machine
@@ -177,7 +220,15 @@ public:
      * \retval  true    Final state was reached
      * \retval  false   Final state not reached
      */
-    bool finalStateReached();
+    bool finalStateReached() const;
+
+    /*!
+     * Checks if the state machine has a final event (event used in the transition to a final state)
+     *
+     * \retval  true    State machine has a final event
+     * \retval  false   State machine does not have a final event
+     */
+    bool hasFinalEvent() const;
 
     /*!
      * Takes the event which triggered the transition to the final state
@@ -195,14 +246,48 @@ public:
     bool hasPendingEvents() const;
 
     /*!
-     * Adds an event to the event queue
+     * Adds an event to the front of the event queue
      *
      * \param   event   Event
      *
      * \retval  true    Success
      * \retval  false   Failure (null, empty event name, state machine not started)
      */
-    bool addEvent(std::unique_ptr<Event> event);
+    bool addEventToFront(Event &&event);
+
+    /*!
+     * Adds an event to the front of the event queue
+     *
+     * \param   eventName       Event name
+     * \param   eventParameter  Event parameter
+     *
+     * \retval  true    Success
+     * \retval  false   Failure (null, empty event name, state machine not started)
+     */
+    bool addEventToFront(const QString &eventName,
+                         std::unique_ptr<IEventParameter> &&eventParameter = {});
+
+    /*!
+     * Adds an event to the back of the event queue
+     *
+     * \param   event   Event
+     *
+     * \retval  true    Success
+     * \retval  false   Failure (null, empty event name, state machine not started)
+     */
+    bool addEventToBack(Event &&event);
+
+    /*!
+     * Adds an event to the back of the event queue
+     *
+     * \param   eventName       Event name
+     * \param   eventParameter  Event parameter
+     *
+     * \retval  true    Success
+     * \retval  false   Failure (null, empty event name, state machine not started)
+     */
+    bool addEventToBack(const QString &eventName,
+                        std::unique_ptr<IEventParameter> &&eventParameter = {});
 
     /*!
      * Processes the next pending event
@@ -216,36 +301,15 @@ public:
      * Adds a new state to the state machine
      *
      * \param   stateName   State name
-     * \param   entryMethod State entry method
-     * \param   exitMethod  State exit method
+     * \param   entryAction State entry action method
+     * \param   exitAction  State exit action method
      *
      * \retval  true    Success
      * \retval  false   Failure (state machine already started, empty or duplicate state name)
      */
     bool addState(const QString &stateName,
-                  StateEntryMethod entryMethod = {},
-                  StateExitMethod exitMethod = {});
-
-    /*!
-     * A convenience method for adding a new state to the state machine from a state object
-     *
-     * \param   stateObject     State object
-     *
-     * \retval  true    Success
-     * \retval  false   Failure (state machine already started, empty or duplicate state name)
-     *
-     * This method represents an alternative way to add a state to the state machine. The state name
-     * and the state entry and exit methods are taken from the interface and used to add a new state
-     * to the state machine.
-     *
-     * \note    Both entry and exit methods will be created for the added state even if the state
-     *          object's entry and exit methods do nothing. This could represent a very small
-     *          performance penalty as otherwise these methods could have been nullptr.
-     *
-     * \note    Because this method always creates the exit method for the state, this method cannot
-     *          be used to add final states!
-     */
-    bool addState(IState &stateObject);
+                  StateEntryAction entryAction = {},
+                  StateExitAction exitAction = {});
 
     /*!
      * Gets the initial state of the state machine
@@ -257,63 +321,166 @@ public:
     /*!
      * Sets an existing state as the initial state of the state machine
      *
-     * \param   stateName   Name of an existing state
+     * \param   initialState    Name of an existing state to use as the initial state
+     * \param   action          Optional transition action method
      *
      * \retval  true    Success
      * \retval  false   Failure (state machine already started, already set, state does not exit)
      *
-     * \note    If the state has an entry method it shall be executed before transitioning to the
-     *          initial state with an "empty" event (event with no name)
+     * The initial transition is executed at startup. First the initial transition's action method
+     * (if available) is executed followed by the initial state's entry action (if available).
+     * After the transition is finished the state machine is in the initial state and processing of
+     * queued events can start.
      */
-    bool setInitialState(const QString &stateName);
+    bool setInitialTransition(const QString &initialState, InitialTransitionAction action = {});
 
     /*!
-     * Adds a new transition between states
+     * Adds a new state transition
      *
-     * \param   fromState       Name of the state to transition from
-     * \param   eventName       Name of the event that triggers the transition
-     * \param   toState         Name of the state to transition to
-     * \param   guardMethod     Optional transition guard method
-     * \param   actionMethod    Optional transition action method
+     * \param   fromState   Name of the state to transition from
+     * \param   trigger     Name of the event that triggers the transition
+     * \param   toState     Name of the state to transition to
+     * \param   action      Optional state transition action method
+     * \param   guard       Optional state transition guard condition method
      *
      * \retval  true    Success
      * \retval  false   Failure (state machine already started, invalid state or event names,
      *                  duplicate transition)
+     *
+     * A state transition is the only way for the state machine to change the state machine state
+     * from one state to another and it is triggered by the specified event.
      */
-    bool addTransition(const QString &fromState,
-                       const QString &eventName,
-                       const QString &toState,
-                       TransitionGuardMethod guardMethod = {},
-                       TransitionActionMethod actionMethod = {});
+    bool addStateTransition(const QString &fromState,
+                            const QString &trigger,
+                            const QString &toState,
+                            StateTransitionAction action = {},
+                            StateTransitionGuardCondition guard = {});
+
+    /*!
+     * Adds a new internal transition
+     *
+     * \param   state   Name of the state to which the transition belongs to
+     * \param   trigger Name of the event that triggers the transition
+     * \param   action  Internal transition action method
+     * \param   guard   Optional internal transition guard condition method
+     *
+     * \retval  true    Success
+     * \retval  false   Failure (state machine already started, invalid state or event names,
+     *                  duplicate transition)
+     *
+     * An internal transition is the only way to execute an action, triggered by the specified
+     * event, that does not result in the change of the state machine state.
+     *
+     * A similar effect can be achieved by creating a self-transition (transition from one state to
+     * itself) but in this case the state's exit and entry actions would be executed.
+     */
+    bool addInternalTransition(const QString &state,
+                               const QString &trigger,
+                               InternalTransitionAction action = {},
+                               InternalTransitionGuardCondition guard = {});
+
+    /*!
+     * Sets the default state transition
+     *
+     * \param   fromState   Name of the state to transition from
+     * \param   toState     Name of the state to transition to
+     * \param   action      Optional state transition action method
+     * \param   guard       Optional state transition guard condition method
+     *
+     * \retval  true    Success
+     * \retval  false   Failure (state machine already started, invalid state or event names,
+     *                  duplicate transition)
+     *
+     * A default state transition will be executed if an event does not trigger any of the
+     * configured state nor internal transitions.
+     *
+     * \note    There can be at most one default transition, either state or internal transition.
+     */
+    bool setDefaultTransition(const QString &fromState,
+                              const QString &toState,
+                              StateTransitionAction action = {},
+                              StateTransitionGuardCondition guard = {});
+
+    /*!
+     * Sets the default internal transition
+     *
+     * \param   state   Name of the state to which the transition belongs to
+     * \param   action  Internal transition action method
+     * \param   guard   Optional internal transition guard condition method
+     *
+     * \retval  true    Success
+     * \retval  false   Failure (state machine already started, invalid state or event names,
+     *                  duplicate transition)
+     *
+     * A default state transition will be executed if an event does not trigger any of the
+     * configured state nor internal transitions.
+     *
+     * \note    There can be at most one default transition, either state or internal transition.
+     */
+    bool setDefaultTransition(const QString &state,
+                              InternalTransitionAction action = {},
+                              InternalTransitionGuardCondition guard = {});
 
 private:
-    //! Holds the transition data
-    struct TransitionData
+    //! Holds the initial transition data
+    struct InitialTransitionData
+    {
+        //! Holds the name of the initial state
+        QString state;
+
+        //! Holds an initial transition action method
+        InitialTransitionAction action;
+    };
+
+    //! Holds the state transition data
+    struct StateTransitionData
     {
         //! Holds the name of the state to transition to
         QString state;
 
-        //! Holds an optional transition guard method
-        TransitionGuardMethod guardMethod;
+        //! Holds an optional state transition guard method
+        StateTransitionGuardCondition guard;
 
-        //! Holds an optional transition action method
-        TransitionActionMethod actionMethod;
+        //! Holds an optional state transition action method
+        StateTransitionAction action;
+    };
+
+    //! Holds the internal transition data
+    struct InternalTransitionData
+    {
+        //! Holds an optional internal transition guard method
+        InternalTransitionGuardCondition guard;
+
+        //! Holds an internal transition action method
+        InternalTransitionAction action;
     };
 
     //! Holds the state data
     struct StateData
     {
-        //! Holds an optional state entry method
-        StateEntryMethod entryMethod;
+        //! Holds an optional state entry action method
+        StateEntryAction entryAction;
 
-        //! Holds an optional state exit method
-        StateExitMethod exitMethod;
+        //! Holds an optional state exit action method
+        StateExitAction exitAction;
 
         /*!
-         * Holds the state's transitions. The key contains the name of the event that triggers the
-         * transition and the value contains the transition data.
+         * Holds the state's state transitions. The key contains the name of the event that triggers
+         * the transition and the value contains the state transition data.
          */
-        QHash<QString, TransitionData> transitions;
+        std::unordered_map<QString, StateTransitionData> stateTransitions;
+
+        /*!
+         * Holds the state's internal transitions. The key contains the name of the event that
+         * triggers the transition and the value contains the state transition data.
+         */
+        std::unordered_map<QString, InternalTransitionData> internalTransitions;
+
+        //! Holds the state's optional default state transitions
+        std::unique_ptr<StateTransitionData> defaultStateTransition;
+
+        //! Holds the state's optional default internal transitions
+        std::unique_ptr<InternalTransitionData> defaultInternalTransition;
     };
 
 private:
@@ -339,31 +506,45 @@ private:
     void traverseStates(const QString &stateName, QSet<QString> *statesReached) const;
 
     /*!
-     * Transition the state machine to the initial state
+     * Checks if the specified state is a final state
      *
-     * \param   event   Event
+     * \param   stateData   State data
      *
-     * \note    This method is only executed in start()
+     * \retval  true    Specified state is a final state
+     * \retval  false   Specified state is not a final state
      */
-    void transitionToInitalState(std::unique_ptr<Event> event);
+    bool isFinalState(const StateData &stateData) const;
 
     /*!
-     * Executes the transition
+     * Executes the initial transition
+     *
+     * \param   event   Event that triggered the transition
+     */
+    void executeInitialTransition(Event &&event);
+
+    /*!
+     * Executes the state transition
      *
      * \param   transitionData  Transition data
      * \param   event           Event that triggered the transition
      */
-    void executeTransition(const TransitionData &transitionData, std::unique_ptr<Event> event);
+    void executeStateTransition(const StateTransitionData &transitionData, Event &&event);
+
+    /*!
+     * Executes the internal transition
+     *
+     * \param   transitionData  Transition data
+     * \param   event           Event that triggered the transition
+     */
+    void executeInternalTransition(const InternalTransitionData &transitionData,
+                                   const Event &event);
 
 private:
     //! Holds all states in the state machine
-    QHash<QString, StateData> m_states;
+    std::unordered_map<QString, StateData> m_states;
 
-    /*!
-     * Holds the name of the initial state of the state machine. The state machine will
-     * automatically transition to this state when the state machine is started.
-     */
-    QString m_initialState;
+    //! Holds the initial transition of the state machine
+    InitialTransitionData m_initialTransition;
 
     //! Holds the validation status
     ValidationStatus m_validationStatus;
@@ -371,20 +552,20 @@ private:
     //! Holds the started flag
     bool m_started;
 
-    //! Holds the mutex used to make access to the started flag thread safe
-    mutable QMutex m_startedMutex;
-
     //! Holds the name of the current state of the state machine
     QString m_currentState;
 
     //! Holds the queued events
-    std::deque<std::unique_ptr<Event>> m_eventQueue;
-
-    //! Holds the mutex used to make access to the event queue thread safe
-    mutable QMutex m_eventQueueMutex;
+    std::deque<Event> m_eventQueue;
 
     //! Holds the event which triggered the transition to the final state
     std::unique_ptr<Event> m_finalEvent;
+
+    //! Holds the mutex used to make access to the started flag thread safe
+    mutable QMutex m_startedMutex;
+
+    //! Holds the mutex used to make access to the event queue thread safe
+    mutable QMutex m_eventQueueMutex;
 
     //! Holds the mutex used to make the API thread safe
     mutable QMutex m_apiMutex;

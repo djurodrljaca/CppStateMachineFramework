@@ -44,7 +44,7 @@ Event::Event(const QString &name)
 
 // -------------------------------------------------------------------------------------------------
 
-Event::Event(const QString &name, std::unique_ptr<IEventParameter> parameter)
+Event::Event(const QString &name, std::unique_ptr<IEventParameter> &&parameter)
     : m_name(name),
       m_parameter(std::move(parameter))
 {
@@ -52,7 +52,7 @@ Event::Event(const QString &name, std::unique_ptr<IEventParameter> parameter)
 
 // -------------------------------------------------------------------------------------------------
 
-QString Event::name() const
+const QString &Event::name() const
 {
     return m_name;
 }

@@ -50,7 +50,6 @@ endif()
 # --------------------------------------------------------------------------------------------------
 add_library(CppStateMachineFramework SHARED
         inc/CppStateMachineFramework/Event.hpp
-        inc/CppStateMachineFramework/IState.hpp
         inc/CppStateMachineFramework/StateMachine.hpp
 
         src/Event.cpp
