@@ -217,14 +217,6 @@ bool StateMachine::start(Event &&event)
 
 // -------------------------------------------------------------------------------------------------
 
-bool StateMachine::start(const QString &eventName,
-                         std::unique_ptr<IEventParameter> &&eventParameter)
-{
-    return start(Event(eventName, std::move(eventParameter)));
-}
-
-// -------------------------------------------------------------------------------------------------
-
 bool StateMachine::stop()
 {
     QMutexLocker locker(&m_apiMutex);
@@ -252,6 +244,8 @@ bool StateMachine::finalStateReached() const
 
     if (it == m_states.end())
     {
+        // This should not be possible as the current state cannot be changed externally and it
+        // should always store the name of an existing state
         qCWarning(s_loggingCategory) << "Current state is invalid!";
         return false;
     }
@@ -314,14 +308,6 @@ bool StateMachine::addEventToFront(Event &&event)
 
 // -------------------------------------------------------------------------------------------------
 
-bool StateMachine::addEventToFront(const QString &eventName,
-                                   std::unique_ptr<IEventParameter> &&eventParameter)
-{
-    return addEventToFront(Event(eventName, std::move(eventParameter)));
-}
-
-// -------------------------------------------------------------------------------------------------
-
 bool StateMachine::addEventToBack(Event &&event)
 {
     QMutexLocker eventQueueLocker(&m_eventQueueMutex);
@@ -345,14 +331,6 @@ bool StateMachine::addEventToBack(Event &&event)
     qCDebug(s_loggingCategory) << "Added event to the back of the event queue:" << event.name();
     m_eventQueue.push_back(std::move(event));
     return true;
-}
-
-// -------------------------------------------------------------------------------------------------
-
-bool StateMachine::addEventToBack(const QString &eventName,
-                                  std::unique_ptr<IEventParameter> &&eventParameter)
-{
-    return addEventToBack(Event(eventName, std::move(eventParameter)));
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -391,12 +369,13 @@ bool StateMachine::processNextEvent()
 
     if (itState == m_states.end())
     {
+        // This should not be possible as the current state cannot be changed externally and it
+        // should always store the name of an existing state
         qCWarning(s_loggingCategory) << "Current state is invalid!";
         return false;
     }
 
     const auto &stateData = itState->second;
-    bool transitionTriggered = false;
 
     if (!stateData.internalTransitions.empty())
     {
@@ -407,11 +386,13 @@ bool StateMachine::processNextEvent()
         {
             // Execute internal transition
             executeInternalTransition(itTransition->second, event);
-            transitionTriggered = true;
+
+            qCDebug(s_loggingCategory) << "Event processed";
+            return true;
         }
     }
 
-    if ((!transitionTriggered) && (!stateData.stateTransitions.empty()))
+    if (!stateData.stateTransitions.empty())
     {
         // Check if a state transition needs to be triggered
         auto itTransition = stateData.stateTransitions.find(event.name());
@@ -420,29 +401,31 @@ bool StateMachine::processNextEvent()
         {
             // Execute state transition
             executeStateTransition(itTransition->second, std::move(event));
-            transitionTriggered = true;
+
+            qCDebug(s_loggingCategory) << "Event processed";
+            return true;
         }
     }
 
-    if ((!transitionTriggered) && stateData.defaultInternalTransition)
+    if (stateData.defaultInternalTransition)
     {
         // Execute default internal transition
         executeInternalTransition(*stateData.defaultInternalTransition, event);
-        transitionTriggered = true;
+
+        qCDebug(s_loggingCategory) << "Event processed";
+        return true;
     }
 
-    if ((!transitionTriggered) && stateData.defaultStateTransition)
+    if (stateData.defaultStateTransition)
     {
         // Execute default state transition
         executeStateTransition(*stateData.defaultStateTransition, std::move(event));
-        transitionTriggered = true;
+
+        qCDebug(s_loggingCategory) << "Event processed";
+        return true;
     }
 
-    if (!transitionTriggered)
-    {
-        qCDebug(s_loggingCategory) << "No transitions for this event, ignore it:" << event.name();
-    }
-
+    qCDebug(s_loggingCategory) << "No transitions for this event, ignore it:" << event.name();
     qCDebug(s_loggingCategory) << "Event processed";
     return true;
 }
@@ -470,7 +453,7 @@ bool StateMachine::addState(const QString &stateName,
         return false;
     }
 
-    if (m_states.find(stateName) == m_states.end())
+    if (m_states.find(stateName) != m_states.end())
     {
         qCWarning(s_loggingCategory) << "A state with the same name already exists:" << stateName;
         return false;
@@ -567,8 +550,8 @@ bool StateMachine::addStateTransition(const QString &fromState,
     // Check if transition already exists
     auto &stateData = itFromState->second;
 
-    if ((stateData.stateTransitions.find(trigger) == stateData.stateTransitions.end()) ||
-        (stateData.internalTransitions.find(trigger) == stateData.internalTransitions.end()))
+    if ((stateData.stateTransitions.find(trigger) != stateData.stateTransitions.end()) ||
+        (stateData.internalTransitions.find(trigger) != stateData.internalTransitions.end()))
     {
         qCWarning(s_loggingCategory)
                 << QString("Transition from state [%1] with event [%2] already exists")
@@ -629,8 +612,8 @@ bool StateMachine::addInternalTransition(const QString &state,
     // Check if transition already exists
     auto &stateData = itState->second;
 
-    if ((stateData.stateTransitions.find(trigger) == stateData.stateTransitions.end()) ||
-        (stateData.internalTransitions.find(trigger) == stateData.internalTransitions.end()))
+    if ((stateData.stateTransitions.find(trigger) != stateData.stateTransitions.end()) ||
+        (stateData.internalTransitions.find(trigger) != stateData.internalTransitions.end()))
     {
         qCWarning(s_loggingCategory)
                 << QString("Transition from state [%1] with event [%2] already exists")
@@ -790,7 +773,8 @@ void StateMachine::traverseStates(const QString &stateName, QSet<QString> *state
 
     if (it == m_states.end())
     {
-        qCWarning(s_loggingCategory) << "Current state is invalid!";
+        // This should not be possible as the method will always be passed an existing state's name
+        qCWarning(s_loggingCategory) << "State name is invalid!";
         return;
     }
 
@@ -818,8 +802,8 @@ bool StateMachine::isFinalState(const StateData &stateData) const
 {
     return (stateData.stateTransitions.empty() &&
             stateData.internalTransitions.empty() &&
-            stateData.defaultStateTransition &&
-            stateData.defaultInternalTransition);
+            (!stateData.defaultStateTransition) &&
+            (!stateData.defaultInternalTransition));
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -843,6 +827,8 @@ void StateMachine::executeInitialTransition(Event &&event)
 
     if (it == m_states.end())
     {
+        // This should not be possible as the initial state cannot be changed after it is set and it
+        // should always store the name of an existing state
         qCWarning(s_loggingCategory) << "Initial state is invalid!";
         return;
     }
@@ -897,6 +883,8 @@ void StateMachine::executeStateTransition(const StateTransitionData &transitionD
 
     if (it == m_states.end())
     {
+        // This should not be possible as the current state cannot be changed externally and it
+        // should always store the name of an existing state
         qCWarning(s_loggingCategory) << "Current state is invalid!";
         return;
     }

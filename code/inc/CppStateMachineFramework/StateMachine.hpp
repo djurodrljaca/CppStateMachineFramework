@@ -24,7 +24,7 @@
 #include <CppStateMachineFramework/Event.hpp>
 
 // Qt includes
-#include <QtCore/qhashfunctions.h>
+#include <QtCore/QHashFunctions>
 #include <QtCore/QMutex>
 
 // System includes
@@ -164,8 +164,8 @@ public:
      * Validates the state and state transitions
      *
      * \retval  true    Success
-     * \retval  false   Failure (state machine not stopped, no states, no initial state, invalid
-     *                  final states, unreachable states)
+     * \retval  false   Failure (state machine not stopped, no states, no initial transition,
+     *                  invalid final states, unreachable states)
      */
     bool validate();
 
@@ -183,7 +183,7 @@ public:
      * \param   event   Startup event to use in the initial transition
      *
      * \retval  true    Success
-     * \retval  false   Failure (state machine already started or invalid)
+     * \retval  false   Failure (invalid startup event, state machine already started or invalid)
      */
     bool start(Event &&event);
 
@@ -196,8 +196,11 @@ public:
      * \retval  true    Success
      * \retval  false   Failure (state machine already started or invalid)
      */
-    bool start(const QString &eventName = QStringLiteral("Started"),
-               std::unique_ptr<IEventParameter> &&eventParameter = {});
+    inline bool start(const QString &eventName = QStringLiteral("Started"),
+                      std::unique_ptr<IEventParameter> &&eventParameter = {})
+    {
+        return start(Event(eventName, std::move(eventParameter)));
+    }
 
     /*!
      * Start the state machine
@@ -251,7 +254,7 @@ public:
      * \param   event   Event
      *
      * \retval  true    Success
-     * \retval  false   Failure (null, empty event name, state machine not started)
+     * \retval  false   Failure (empty event name, state machine not started)
      */
     bool addEventToFront(Event &&event);
 
@@ -262,10 +265,13 @@ public:
      * \param   eventParameter  Event parameter
      *
      * \retval  true    Success
-     * \retval  false   Failure (null, empty event name, state machine not started)
+     * \retval  false   Failure (empty event name, state machine not started)
      */
-    bool addEventToFront(const QString &eventName,
-                         std::unique_ptr<IEventParameter> &&eventParameter = {});
+    inline bool addEventToFront(const QString &eventName,
+                                std::unique_ptr<IEventParameter> &&eventParameter = {})
+    {
+        return addEventToFront(Event(eventName, std::move(eventParameter)));
+    }
 
     /*!
      * Adds an event to the back of the event queue
@@ -273,7 +279,7 @@ public:
      * \param   event   Event
      *
      * \retval  true    Success
-     * \retval  false   Failure (null, empty event name, state machine not started)
+     * \retval  false   Failure (empty event name, state machine not started)
      */
     bool addEventToBack(Event &&event);
 
@@ -284,10 +290,13 @@ public:
      * \param   eventParameter  Event parameter
      *
      * \retval  true    Success
-     * \retval  false   Failure (null, empty event name, state machine not started)
+     * \retval  false   Failure (empty event name, state machine not started)
      */
-    bool addEventToBack(const QString &eventName,
-                        std::unique_ptr<IEventParameter> &&eventParameter = {});
+    inline bool addEventToBack(const QString &eventName,
+                               std::unique_ptr<IEventParameter> &&eventParameter = {})
+    {
+        return addEventToBack(Event(eventName, std::move(eventParameter)));
+    }
 
     /*!
      * Processes the next pending event
@@ -305,7 +314,7 @@ public:
      * \param   exitAction  State exit action method
      *
      * \retval  true    Success
-     * \retval  false   Failure (state machine already started, empty or duplicate state name)
+     * \retval  false   Failure (state machine already started, empty state name or duplicate state)
      */
     bool addState(const QString &stateName,
                   StateEntryAction entryAction = {},
@@ -325,7 +334,7 @@ public:
      * \param   action          Optional transition action method
      *
      * \retval  true    Success
-     * \retval  false   Failure (state machine already started, already set, state does not exit)
+     * \retval  false   Failure (already set, state does not exit)
      *
      * The initial transition is executed at startup. First the initial transition's action method
      * (if available) is executed followed by the initial state's entry action (if available).
@@ -366,7 +375,7 @@ public:
      *
      * \retval  true    Success
      * \retval  false   Failure (state machine already started, invalid state or event names,
-     *                  duplicate transition)
+     *                  missing action, duplicate transition)
      *
      * An internal transition is the only way to execute an action, triggered by the specified
      * event, that does not result in the change of the state machine state.
@@ -389,7 +398,7 @@ public:
      *
      * \retval  true    Success
      * \retval  false   Failure (state machine already started, invalid state or event names,
-     *                  duplicate transition)
+     *                  already set)
      *
      * A default state transition will be executed if an event does not trigger any of the
      * configured state nor internal transitions.
@@ -409,8 +418,8 @@ public:
      * \param   guard   Optional internal transition guard condition method
      *
      * \retval  true    Success
-     * \retval  false   Failure (state machine already started, invalid state or event names,
-     *                  duplicate transition)
+     * \retval  false   Failure (state machine already started, invalid state name, missing action,
+     *                  already set)
      *
      * A default state transition will be executed if an event does not trigger any of the
      * configured state nor internal transitions.
@@ -418,7 +427,7 @@ public:
      * \note    There can be at most one default transition, either state or internal transition.
      */
     bool setDefaultTransition(const QString &state,
-                              InternalTransitionAction action = {},
+                              InternalTransitionAction action,
                               InternalTransitionGuardCondition guard = {});
 
 private:
