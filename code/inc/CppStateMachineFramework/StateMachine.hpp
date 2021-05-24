@@ -22,13 +22,14 @@
 
 // C++ State Machine Framework includes
 #include <CppStateMachineFramework/Event.hpp>
+#include <CppStateMachineFramework/HashFunctions.hpp>
 
 // Qt includes
-#include <QtCore/QHashFunctions>
 #include <QtCore/QMutex>
 
 // System includes
 #include <deque>
+#include <functional>
 #include <unordered_map>
 
 // Forward declarations
