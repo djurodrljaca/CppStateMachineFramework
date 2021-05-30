@@ -76,37 +76,25 @@ A state machine can be created with the state machine framework by following the
 
 ##### Adding states
 
-To configure a state machine you must start by adding states to it. If a state needs to have entry
-and exit actions then they need to be set while the state is being added to the state machine:
+To configure a state machine you must start by adding states to it:
 
 ```C++
-// State with both entry and exit actions
-stateMachine.addState(
+stateMachine.addState("state1");
+```
+
+If a state needs to have entry and/or exit actions then they can be set after the state is added to
+the state machine:
+
+```C++
+stateMachine.setStateEntryAction(
     "state1",
     [](const Event &trigger, const QString &currentState, const QString &previousState)
     {
         /* state's entry action */
-    },
-    [](const Event &trigger, const QString &currentState, const QString &nextState)
-    {
-        /* state's exit action */
     });
 
-// State without actions
-stateMachine.addState("state2");
-
-// State with an entry action but without an exit action
-stateMachine.addState(
-    "state3",
-    [](const Event &trigger, const QString &currentState, const QString &previousState)
-    {
-        /* state's entry action */
-    });
-
-// State with an exit action but without an entry action
-stateMachine.addState(
-    "state4",
-    {},
+stateMachine.setStateExitAction(
+    "state1",
     [](const Event &trigger, const QString &currentState, const QString &nextState)
     {
         /* state's exit action */

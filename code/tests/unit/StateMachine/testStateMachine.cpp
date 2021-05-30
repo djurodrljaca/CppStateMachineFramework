@@ -57,6 +57,8 @@ private slots:
     void testValidate();
     void testStartStop();
     void testAddState();
+    void testSetStateEntryAction();
+    void testSetStateExitAction();
     void testSetInitialTransition();
     void testAddStateTransition();
     void testAddInternalTransition();
@@ -298,12 +300,19 @@ void TestStateMachine::testValidate()
     QVERIFY(stateMachine.start());
     QVERIFY(stateMachine.isStarted());
 
-    // It must not be possible to execute the validation procedure or add a state or transition when
-    // the state machine is started but this must not invalidate the state machine
+    // It must not be possible to execute the validation procedure or modify the state machine
+    // configuration when the state machine is started but this must not invalidate the state
+    // machine
     QVERIFY(!stateMachine.validate());
     QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
 
     QVERIFY(!stateMachine.addState("c"));
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
+
+    QVERIFY(!stateMachine.setStateEntryAction("a", m_dummyStateExitAction));
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
+
+    QVERIFY(!stateMachine.setStateExitAction("a", m_dummyStateExitAction));
     QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
 
     QVERIFY(!stateMachine.addStateTransition("a", "to_b", "b"));
@@ -317,7 +326,8 @@ void TestStateMachine::testValidate()
     QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
 
     // Add an invalid final state (no transitions from it to other states and an exit method)
-    QVERIFY(stateMachine.addState("c", {}, m_dummyStateExitAction));
+    QVERIFY(stateMachine.addState("c"));
+    QVERIFY(stateMachine.setStateExitAction("c", m_dummyStateExitAction));
 
     QVERIFY(!stateMachine.validate());
     QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Invalid);
@@ -432,14 +442,10 @@ void TestStateMachine::testAddState()
     // Add a state with an empty name
     QVERIFY(!stateMachine.addState(""));
 
-    // Add a state with entry method
-    QVERIFY(stateMachine.addState("b", m_dummyStateEntryAction));
-
-    // Add a state with exit method
-    QVERIFY(stateMachine.addState("c", {}, m_dummyStateExitAction));
-
-    // Add a state with entry and exit method
-    QVERIFY(stateMachine.addState("d", m_dummyStateEntryAction, m_dummyStateExitAction));
+    // Add a few more valid states
+    QVERIFY(stateMachine.addState("b"));
+    QVERIFY(stateMachine.addState("c"));
+    QVERIFY(stateMachine.addState("d"));
 
     // Set the initial state and add transitions to make the state machine valid then start it
     QVERIFY(stateMachine.setInitialTransition("a"));
@@ -459,6 +465,44 @@ void TestStateMachine::testAddState()
 
     // Add a state while state machine is started
     QVERIFY(!stateMachine.addState("e"));
+}
+
+// Test: setStateEntryAction() ---------------------------------------------------------------------
+
+void TestStateMachine::testSetStateEntryAction()
+{
+    StateMachine stateMachine;
+
+    // Add a state
+    QVERIFY(stateMachine.addState("a"));
+
+    // Set an empty entry action
+    QVERIFY(!stateMachine.setStateEntryAction("a", {}));
+
+    // Set a valid entry action
+    QVERIFY(stateMachine.setStateEntryAction("a", m_dummyStateEntryAction));
+
+    // Set another valid entry action
+    QVERIFY(!stateMachine.setStateEntryAction("a", m_dummyStateEntryAction));
+}
+
+// Test: setStateExitAction() ----------------------------------------------------------------------
+
+void TestStateMachine::testSetStateExitAction()
+{
+    StateMachine stateMachine;
+
+    // Add a state
+    QVERIFY(stateMachine.addState("a"));
+
+    // Set an empty exit action
+    QVERIFY(!stateMachine.setStateExitAction("a", {}));
+
+    // Set a valid exit action
+    QVERIFY(stateMachine.setStateExitAction("a", m_dummyStateExitAction));
+
+    // Set another valid exit action
+    QVERIFY(!stateMachine.setStateExitAction("a", m_dummyStateExitAction));
 }
 
 // Test: setInitialState() -------------------------------------------------------------------------
@@ -925,20 +969,61 @@ void TestStateMachine::testStateAndTransitionMethods()
     bool guardValueA = false;
     bool guardValueB = false;
 
-    auto initialAction = [&](const Event &trigger, const QString &initialState)
+    // Initialize and validate the state machine
+    StateMachine stateMachine;
+
+    QVERIFY(stateMachine.addState("a"));
+    QVERIFY(stateMachine.setStateEntryAction(
+                "a",
+                [&](const Event &trigger, const QString &fromState, const QString &toState)
+    {
+        log.append(QString("entryA: '%1' --> '%2' --> '%3'")
+                   .arg(fromState,
+                        trigger.name(),
+                        toState));
+    }));
+    QVERIFY(stateMachine.setStateExitAction(
+                "a",
+                [&](const Event &trigger, const QString &fromState, const QString &toState)
+    {
+        log.append(QString("exitA: '%1' --> '%2' --> '%3'").arg(fromState,
+                                                                trigger.name(),
+                                                                toState));
+    }));
+
+    QVERIFY(stateMachine.addState("b"));
+    QVERIFY(stateMachine.setStateEntryAction(
+                "b",
+                [&](const Event &event, const QString &fromState, const QString &toState)
+    {
+        log.append(QString("entryB: '%1' --> '%2' --> '%3'").arg(fromState, event.name(), toState));
+    }));
+    QVERIFY(stateMachine.setStateExitAction(
+                "b", [&](const Event &event, const QString &fromState, const QString &toState)
+    {
+        log.append(QString("exitB: '%1' --> '%2' --> '%3'").arg(fromState, event.name(), toState));
+    }));
+
+    QVERIFY(stateMachine.addState("c"));
+    QVERIFY(stateMachine.setStateEntryAction(
+                "c",
+                [&](const Event &event, const QString &fromState, const QString &toState)
+    {
+        log.append(QString("entryC: '%1' --> '%2' --> '%3'").arg(fromState, event.name(), toState));
+    }));
+
+    QVERIFY(stateMachine.setInitialTransition(
+                "a",
+                [&](const Event &trigger, const QString &initialState)
     {
         log.append(QString("init: '%1' --> '%2'").arg(trigger.name(), initialState));
-    };
+    }));
 
-    auto entryA = [&](const Event &trigger, const QString &fromState, const QString &toState)
+    auto actionAB = [&](const Event &trigger, const QString &fromState, const QString &toState)
     {
-        log.append(QString("entryA: '%1' --> '%2' --> '%3'").arg(fromState, trigger.name(), toState));
+        log.append(QString("actionAB: '%1' --> '%2' --> '%3'")
+                   .arg(fromState, trigger.name(), toState));
     };
-    auto exitA = [&](const Event &trigger, const QString &fromState, const QString &toState)
-    {
-        log.append(QString("exitA: '%1' --> '%2' --> '%3'").arg(fromState, trigger.name(), toState));
-    };
-
     auto guardAB = [&](const Event &trigger, const QString &fromState, const QString &toState)
     {
         if (guardValueAB)
@@ -954,12 +1039,13 @@ void TestStateMachine::testStateAndTransitionMethods()
 
         return guardValueAB;
     };
-    auto actionAB = [&](const Event &trigger, const QString &fromState, const QString &toState)
-    {
-        log.append(QString("actionAB: '%1' --> '%2' --> '%3'")
-                   .arg(fromState, trigger.name(), toState));
-    };
+    QVERIFY(stateMachine.addStateTransition("a", "a_to_b", "b", actionAB, guardAB));
 
+    auto actionA = [&](const Event &trigger, const QString &currentState)
+    {
+        log.append(QString("actionA: '%1' --> '%2'")
+                   .arg(currentState, trigger.name()));
+    };
     auto guardA = [&](const Event &trigger, const QString &currentState)
     {
         if (guardValueA)
@@ -975,27 +1061,21 @@ void TestStateMachine::testStateAndTransitionMethods()
 
         return guardValueA;
     };
-    auto actionA = [&](const Event &trigger, const QString &currentState)
-    {
-        log.append(QString("actionA: '%1' --> '%2'")
-                   .arg(currentState, trigger.name()));
-    };
-
-    auto defaultActionAA = [&](const Event &trigger, const QString &fromState, const QString &toState)
+    QVERIFY(stateMachine.addInternalTransition("a", "int_a", actionA, guardA));
+    QVERIFY(stateMachine.setDefaultTransition(
+                "a",
+                "a",
+                [&](const Event &trigger, const QString &fromState, const QString &toState)
     {
         log.append(QString("defaultActionAA: '%1' --> '%2' --> '%3'")
                    .arg(fromState, trigger.name(), toState));
-    };
+    }));
 
-    auto entryB = [&](const Event &event, const QString &fromState, const QString &toState)
+    auto actionBB = [&](const Event &event, const QString &fromState, const QString &toState)
     {
-        log.append(QString("entryB: '%1' --> '%2' --> '%3'").arg(fromState, event.name(), toState));
+        log.append(QString("actionBB: '%1' --> '%2' --> '%3'")
+                   .arg(fromState, event.name(), toState));
     };
-    auto exitB = [&](const Event &event, const QString &fromState, const QString &toState)
-    {
-        log.append(QString("exitB: '%1' --> '%2' --> '%3'").arg(fromState, event.name(), toState));
-    };
-
     auto guardBB = [&](const Event &event, const QString &fromState, const QString &toState)
     {
         if (guardValueBB)
@@ -1011,12 +1091,13 @@ void TestStateMachine::testStateAndTransitionMethods()
 
         return guardValueBB;
     };
-    auto actionBB = [&](const Event &event, const QString &fromState, const QString &toState)
+    QVERIFY(stateMachine.addStateTransition("b", "b_to_b", "b", actionBB, guardBB));
+
+    auto actionBC = [&](const Event &event, const QString &fromState, const QString &toState)
     {
-        log.append(QString("actionBB: '%1' --> '%2' --> '%3'")
+        log.append(QString("actionBC: '%1' --> '%2' --> '%3'")
                    .arg(fromState, event.name(), toState));
     };
-
     auto guardBC = [&](const Event &event, const QString &fromState, const QString &toState)
     {
         if (guardValueBC)
@@ -1032,12 +1113,13 @@ void TestStateMachine::testStateAndTransitionMethods()
 
         return guardValueBC;
     };
-    auto actionBC = [&](const Event &event, const QString &fromState, const QString &toState)
-    {
-        log.append(QString("actionBC: '%1' --> '%2' --> '%3'")
-                   .arg(fromState, event.name(), toState));
-    };
+    QVERIFY(stateMachine.addStateTransition("b", "b_to_c", "c", actionBC, guardBC));
 
+    auto actionB = [&](const Event &trigger, const QString &currentState)
+    {
+        log.append(QString("actionB: '%1' --> '%2'")
+                   .arg(currentState, trigger.name()));
+    };
     auto guardB = [&](const Event &trigger, const QString &currentState)
     {
         if (guardValueB)
@@ -1053,40 +1135,15 @@ void TestStateMachine::testStateAndTransitionMethods()
 
         return guardValueB;
     };
-    auto actionB = [&](const Event &trigger, const QString &currentState)
-    {
-        log.append(QString("actionB: '%1' --> '%2'")
-                   .arg(currentState, trigger.name()));
-    };
+    QVERIFY(stateMachine.addInternalTransition("b", "int_b", actionB, guardB));
 
-    auto defaultActionB = [&](const Event &trigger, const QString &currentState)
+    QVERIFY(stateMachine.setDefaultTransition(
+                "b",
+                [&](const Event &trigger, const QString &currentState)
     {
         log.append(QString("defaultActionB: '%1' --> '%2'")
                    .arg(currentState, trigger.name()));
-    };
-
-    auto entryC = [&](const Event &event, const QString &fromState, const QString &toState)
-    {
-        log.append(QString("entryC: '%1' --> '%2' --> '%3'").arg(fromState, event.name(), toState));
-    };
-
-    // Initialize and validate the state machine
-    StateMachine stateMachine;
-
-    QVERIFY(stateMachine.addState("a", entryA, exitA));
-    QVERIFY(stateMachine.addState("b", entryB, exitB));
-    QVERIFY(stateMachine.addState("c", entryC));
-
-    QVERIFY(stateMachine.setInitialTransition("a", initialAction));
-
-    QVERIFY(stateMachine.addStateTransition("a", "a_to_b", "b", actionAB, guardAB));
-    QVERIFY(stateMachine.addInternalTransition("a", "int_a", actionA, guardA));
-    QVERIFY(stateMachine.setDefaultTransition("a", "a", defaultActionAA));
-
-    QVERIFY(stateMachine.addStateTransition("b", "b_to_b", "b", actionBB, guardBB));
-    QVERIFY(stateMachine.addStateTransition("b", "b_to_c", "c", actionBC, guardBC));
-    QVERIFY(stateMachine.addInternalTransition("b", "int_b", actionB, guardB));
-    QVERIFY(stateMachine.setDefaultTransition("b", defaultActionB));
+    }));
 
     QVERIFY(stateMachine.validate());
     QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
@@ -1313,9 +1370,17 @@ void TestStateMachine::testStateMachineWithLoop()
     // Initialize and validate the state machine
     StateMachine stateMachine;
 
-    QVERIFY(stateMachine.addState("a", [&](auto &, auto &, auto &) { log.append("a"); }));
-    QVERIFY(stateMachine.addState("b", [&](auto &, auto &, auto &) { log.append("b"); }));
-    QVERIFY(stateMachine.addState("c", [&](auto &, auto &, auto &) { log.append("c"); }));
+    QVERIFY(stateMachine.addState("a"));
+    QVERIFY(stateMachine.setStateEntryAction("a",
+                                             [&](auto &, auto &, auto &) { log.append("a"); }));
+
+    QVERIFY(stateMachine.addState("b"));
+    QVERIFY(stateMachine.setStateEntryAction("b",
+                                             [&](auto &, auto &, auto &) { log.append("b"); }));
+
+    QVERIFY(stateMachine.addState("c"));
+    QVERIFY(stateMachine.setStateEntryAction("c",
+                                             [&](auto &, auto &, auto &) { log.append("c"); }));
 
     QVERIFY(stateMachine.setInitialTransition("a"));
 
@@ -1361,11 +1426,15 @@ void TestStateMachine::testAddEventFromAction()
     // Initialize and validate the state machine
     StateMachine stateMachine;
 
-    QVERIFY(stateMachine.addState("a", [&](auto &, auto &, auto &)
+    QVERIFY(stateMachine.addState("a"));
+    QVERIFY(stateMachine.setStateEntryAction("a",
+                                             [&](auto &, auto &, auto &)
     {
         stateMachine.addEventToFront("a_to_b");
     }));
-    QVERIFY(stateMachine.addState("b", [&](auto &, auto &, auto &)
+    QVERIFY(stateMachine.addState("b"));
+    QVERIFY(stateMachine.setStateEntryAction("b",
+                                             [&](auto &, auto &, auto &)
     {
         stateMachine.addEventToFront("b_to_c");
     }));

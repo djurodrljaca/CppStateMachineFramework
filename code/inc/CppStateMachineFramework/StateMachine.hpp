@@ -311,15 +311,33 @@ public:
      * Adds a new state to the state machine
      *
      * \param   stateName   State name
-     * \param   entryAction State entry action method
-     * \param   exitAction  State exit action method
      *
      * \retval  true    Success
      * \retval  false   Failure (state machine already started, empty state name or duplicate state)
      */
-    bool addState(const QString &stateName,
-                  StateEntryAction entryAction = {},
-                  StateExitAction exitAction = {});
+    bool addState(const QString &stateName);
+
+    /*!
+     * Sets a state's entry action
+     *
+     * \param   stateName   State name
+     * \param   entryAction State entry action method
+     *
+     * \retval  true    Success
+     * \retval  false   Failure (state machine already started, empty action, state does not exit)
+     */
+    bool setStateEntryAction(const QString &stateName, StateEntryAction entryAction);
+
+    /*!
+     * Sets a state's exit action
+     *
+     * \param   stateName   State name
+     * \param   exitAction  State exit action method
+     *
+     * \retval  true    Success
+     * \retval  false   Failure (state machine already started, empty action, state does not exit)
+     */
+    bool setStateExitAction(const QString &stateName, StateExitAction exitAction);
 
     /*!
      * Gets the initial state of the state machine

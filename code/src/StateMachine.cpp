@@ -432,9 +432,7 @@ bool StateMachine::processNextEvent()
 
 // -------------------------------------------------------------------------------------------------
 
-bool StateMachine::addState(const QString &stateName,
-                            StateEntryAction entryAction,
-                            StateExitAction exitAction)
+bool StateMachine::addState(const QString &stateName)
 {
     QMutexLocker locker(&m_apiMutex);
 
@@ -460,10 +458,104 @@ bool StateMachine::addState(const QString &stateName,
     }
 
     // Add state
-    m_states[stateName] = { std::move(entryAction), std::move(exitAction), {}, {}, {}, {} };
+    m_states[stateName] = {};
     m_validationStatus = ValidationStatus::Unvalidated;
 
     qCDebug(s_loggingCategory) << "Added a new state:" << stateName;
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool StateMachine::setStateEntryAction(const QString &stateName, StateEntryAction entryAction)
+{
+    QMutexLocker locker(&m_apiMutex);
+
+    // Check if a state's entry action is allowed to be set at this time
+    if (isStarted())
+    {
+        qCWarning(s_loggingCategory)
+                << "State's entry action can be set only when the state machine is stopped";
+        return false;
+    }
+
+    // Check if the action is empty
+    if (!entryAction)
+    {
+        qCWarning(s_loggingCategory) << "Invalid state's entry action:" << stateName;
+        return false;
+    }
+
+    // Check if the state name is valid
+    auto itState = m_states.find(stateName);
+
+    if (itState == m_states.end())
+    {
+        qCWarning(s_loggingCategory) << "State does not exist:" << stateName;
+        return false;
+    }
+
+    // Check if state's entry action already exists
+    auto &stateData = itState->second;
+
+    if (stateData.entryAction)
+    {
+        qCWarning(s_loggingCategory) << "The state's entry action is already set:" << stateName;
+        return false;
+    }
+
+    // Set state's entry action
+    stateData.entryAction = std::move(entryAction);
+    m_validationStatus = ValidationStatus::Unvalidated;
+
+    qCDebug(s_loggingCategory) << "Set the state's entry action:" << stateName;
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool StateMachine::setStateExitAction(const QString &stateName, StateExitAction exitAction)
+{
+    QMutexLocker locker(&m_apiMutex);
+
+    // Check if a state's exit action is allowed to be set at this time
+    if (isStarted())
+    {
+        qCWarning(s_loggingCategory)
+                << "State's exit action can be set only when the state machine is stopped";
+        return false;
+    }
+
+    // Check if the action is empty
+    if (!exitAction)
+    {
+        qCWarning(s_loggingCategory) << "Invalid state's exit action:" << stateName;
+        return false;
+    }
+
+    // Check if the state name is valid
+    auto itState = m_states.find(stateName);
+
+    if (itState == m_states.end())
+    {
+        qCWarning(s_loggingCategory) << "State does not exist:" << stateName;
+        return false;
+    }
+
+    // Check if state's exit action already exists
+    auto &stateData = itState->second;
+
+    if (stateData.exitAction)
+    {
+        qCWarning(s_loggingCategory) << "The state's exit action is already set:" << stateName;
+        return false;
+    }
+
+    // Set state's exit action
+    stateData.exitAction = std::move(exitAction);
+    m_validationStatus = ValidationStatus::Unvalidated;
+
+    qCDebug(s_loggingCategory) << "Set the state's exit action:" << stateName;
     return true;
 }
 
