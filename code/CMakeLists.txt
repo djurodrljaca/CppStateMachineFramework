@@ -52,6 +52,7 @@ add_library(CppStateMachineFramework SHARED
         inc/CppStateMachineFramework/Event.hpp
         inc/CppStateMachineFramework/HashFunctions.hpp
         inc/CppStateMachineFramework/StateMachine.hpp
+        inc/CppStateMachineFramework/StateMachineMethods.hpp
 
         src/Event.cpp
         src/StateMachine.cpp

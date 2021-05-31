@@ -930,7 +930,7 @@ void StateMachine::executeInitialTransition(Event &&event)
     if (stateData.entryAction)
     {
         qCDebug(s_loggingCategory) << "Executing entry action...";
-        stateData.entryAction(event, QString(), m_initialTransition.state);
+        stateData.entryAction(event, m_initialTransition.state, QString());
         qCDebug(s_loggingCategory) << "entry action executed";
     }
 
@@ -1004,7 +1004,7 @@ void StateMachine::executeStateTransition(const StateTransitionData &transitionD
     if (nextStateData.entryAction)
     {
         qCDebug(s_loggingCategory) << "Executing entry action...";
-        nextStateData.entryAction(event, m_currentState, transitionData.state);
+        nextStateData.entryAction(event, transitionData.state, m_currentState);
         qCDebug(s_loggingCategory) << "entry action executed";
     }
 

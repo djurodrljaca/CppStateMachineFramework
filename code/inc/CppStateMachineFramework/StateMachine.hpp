@@ -21,15 +21,14 @@
 #pragma once
 
 // C++ State Machine Framework includes
-#include <CppStateMachineFramework/Event.hpp>
 #include <CppStateMachineFramework/HashFunctions.hpp>
+#include <CppStateMachineFramework/StateMachineMethods.hpp>
 
 // Qt includes
 #include <QtCore/QMutex>
 
 // System includes
 #include <deque>
-#include <functional>
 #include <unordered_map>
 
 // Forward declarations
@@ -57,83 +56,6 @@ public:
         //! State machine is not valid (validation failed)
         Invalid
     };
-
-    /*!
-     * Type alias for a state entry action method
-     *
-     * \param   trigger         Event that triggered the transition to the state
-     * \param   currentState    Name of the current state
-     * \param   previousState   Name of the previous state
-     */
-    using StateEntryAction = std::function<void(const Event &trigger,
-                                                const QString &currentState,
-                                                const QString &previousState)>;
-
-    /*!
-     * Type alias for a state exit action method
-     *
-     * \param   trigger         Event that triggered the transition from the state
-     * \param   currentState    Name of the current state
-     * \param   nextState       Name of the next state
-     */
-    using StateExitAction = std::function<void(const Event &trigger,
-                                               const QString &currentState,
-                                               const QString &nextState)>;
-
-    /*!
-     * Type alias for a state transition guard condition method
-     *
-     * \param   trigger         Event that triggered the transition
-     * \param   currentState    Name of the current state
-     * \param   nextState       Name of the next state
-     *
-     * \retval  true    Transition is allowed
-     * \retval  false   Transition is not allowed
-     */
-    using StateTransitionGuardCondition = std::function<bool(const Event &trigger,
-                                                             const QString &currentState,
-                                                             const QString &nextState)>;
-
-    /*!
-     * Type alias for a state transition action method
-     *
-     * \param   trigger     Event that triggered the transition
-     * \param   currentState    Name of the current state
-     * \param   nextState       Name of the next state
-     */
-    using StateTransitionAction = std::function<void(const Event &trigger,
-                                                     const QString &currentState,
-                                                     const QString &nextState)>;
-
-    /*!
-     * Type alias for an internal transition guard condition method
-     *
-     * \param   trigger         Event that triggered the transition
-     * \param   currentState    Name of the current state
-     *
-     * \retval  true    Transition is allowed
-     * \retval  false   Transition is not allowed
-     */
-    using InternalTransitionGuardCondition = std::function<bool(const Event &trigger,
-                                                                const QString &currentState)>;
-
-    /*!
-     * Type alias for an internal transition action method
-     *
-     * \param   trigger         Event that triggered the transition
-     * \param   currentState    Name of the current state
-     */
-    using InternalTransitionAction = std::function<void(const Event &trigger,
-                                                        const QString &currentState)>;
-
-    /*!
-     * Type alias for an initial transition action method
-     *
-     * \param   trigger         Event that triggered the transition
-     * \param   initialState    Name of the initial state
-     */
-    using InitialTransitionAction = std::function<void(const Event &trigger,
-                                                       const QString &initialState)>;
 
 public:
     //! Constructor

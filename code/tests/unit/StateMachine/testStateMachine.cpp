@@ -70,14 +70,120 @@ private slots:
     void testStateAndTransitionMethods();
     void testStateMachineWithLoop();
     void testAddEventFromAction();
+    void testCreateClassMethodsFull();
+    void testCreateClassMethodsVoid();
 
 private:
-    const StateMachine::StateEntryAction m_dummyStateEntryAction;
-    const StateMachine::StateExitAction m_dummyStateExitAction;
-    const StateMachine::StateTransitionGuardCondition m_dummyStateTransitionGuard;
-    const StateMachine::StateTransitionAction m_dummyStateTransitionAction;
-    const StateMachine::InternalTransitionGuardCondition m_dummyInternalTransitionGuard;
-    const StateMachine::InternalTransitionAction m_dummyInternalTransitionAction;
+    const StateEntryAction m_dummyStateEntryAction;
+    const StateExitAction m_dummyStateExitAction;
+    const StateTransitionGuardCondition m_dummyStateTransitionGuard;
+    const StateTransitionAction m_dummyStateTransitionAction;
+    const InternalTransitionGuardCondition m_dummyInternalTransitionGuard;
+    const InternalTransitionAction m_dummyInternalTransitionAction;
+};
+
+class LogHelper
+{
+public:
+    void initialTransitionActionFull(const Event &trigger, const QString &initialState)
+    {
+        m_log.append(QString("initialTransitionActionFull: [%1], [%2]").arg(trigger.name(),
+                                                                            initialState));
+    }
+
+    void initialTransitionActionVoid()
+    {
+        m_log.append("initialTransitionActionVoid");
+    }
+
+    void stateEntryActionFull(const Event &trigger,
+                              const QString &currentState,
+                              const QString &previousState)
+    {
+        m_log.append(QString("stateEntryActionFull: [%1], [%2], [%3]").arg(trigger.name(),
+                                                                           currentState,
+                                                                           previousState));
+    }
+
+    void stateEntryActionVoid()
+    {
+        m_log.append("stateEntryActionVoid");
+    }
+
+    void stateExitActionFull(const Event &trigger,
+                              const QString &currentState,
+                              const QString &nextState)
+    {
+        m_log.append(QString("stateExitActionFull: [%1], [%2], [%3]").arg(trigger.name(),
+                                                                          currentState,
+                                                                          nextState));
+    }
+
+    void stateExitActionVoid()
+    {
+        m_log.append("stateExitActionVoid");
+    }
+
+    bool stateTransitionGuardConditionFull(const Event &trigger,
+                                           const QString &currentState,
+                                           const QString &nextState)
+    {
+        m_log.append(QString("stateTransitionGuardConditionFull: [%1], [%2], [%3]")
+                     .arg(trigger.name(), currentState, nextState));
+        return true;
+    }
+
+    bool stateTransitionGuardConditionVoid()
+    {
+        m_log.append("stateTransitionGuardConditionVoid");
+        return true;
+    }
+
+    void stateTransitionActionFull(const Event &trigger,
+                                   const QString &currentState,
+                                   const QString &nextState)
+    {
+        m_log.append(QString("stateTransitionActionFull: [%1], [%2], [%3]").arg(trigger.name(),
+                                                                                currentState,
+                                                                                nextState));
+    }
+
+    void stateTransitionActionVoid()
+    {
+        m_log.append("stateTransitionActionVoid");
+    }
+
+    bool internalTransitionGuardConditionFull(const Event &trigger, const QString &currentState)
+    {
+        m_log.append(QString("internalTransitionGuardConditionFull: [%1], [%2]").arg(trigger.name(),
+                                                                                     currentState));
+        return true;
+    }
+
+    bool internalTransitionGuardConditionVoid()
+    {
+        m_log.append("internalTransitionGuardConditionVoid");
+        return true;
+    }
+
+    void internalTransitionActionFull(const Event &trigger, const QString &currentState)
+    {
+        m_log.append(QString("internalTransitionActionFull: [%1], [%2]").arg(trigger.name(),
+                                                                             currentState));
+    }
+
+    void internalTransitionActionVoid()
+    {
+        m_log.append("internalTransitionActionVoid");
+    }
+
+    const QStringList &log() const
+    {
+        return m_log;
+    }
+
+private:
+    QStringList m_log;
 };
 
 // Constructor -------------------------------------------------------------------------------------
@@ -690,7 +796,7 @@ void TestStateMachine::testAddDefaultInternalTransition()
     QVERIFY(!stateMachine.setDefaultTransition("d", m_dummyInternalTransitionAction));
 
     // Set transition with invalid action
-    QVERIFY(!stateMachine.setDefaultTransition("a", StateMachine::InternalTransitionAction()));
+    QVERIFY(!stateMachine.setDefaultTransition("a", InternalTransitionAction()));
 
     // Set the initial transition to make the state machine valid then start it
     QVERIFY(stateMachine.setInitialTransition("a"));
@@ -975,41 +1081,47 @@ void TestStateMachine::testStateAndTransitionMethods()
     QVERIFY(stateMachine.addState("a"));
     QVERIFY(stateMachine.setStateEntryAction(
                 "a",
-                [&](const Event &trigger, const QString &fromState, const QString &toState)
+                [&](const Event &trigger, const QString &currentState, const QString &previousState)
     {
         log.append(QString("entryA: '%1' --> '%2' --> '%3'")
-                   .arg(fromState,
+                   .arg(previousState,
                         trigger.name(),
-                        toState));
+                        currentState));
     }));
     QVERIFY(stateMachine.setStateExitAction(
                 "a",
-                [&](const Event &trigger, const QString &fromState, const QString &toState)
+                [&](const Event &trigger, const QString &currentState, const QString &nextState)
     {
-        log.append(QString("exitA: '%1' --> '%2' --> '%3'").arg(fromState,
+        log.append(QString("exitA: '%1' --> '%2' --> '%3'").arg(currentState,
                                                                 trigger.name(),
-                                                                toState));
+                                                                nextState));
     }));
 
     QVERIFY(stateMachine.addState("b"));
     QVERIFY(stateMachine.setStateEntryAction(
                 "b",
-                [&](const Event &event, const QString &fromState, const QString &toState)
+                [&](const Event &trigger, const QString &currentState, const QString &previousState)
     {
-        log.append(QString("entryB: '%1' --> '%2' --> '%3'").arg(fromState, event.name(), toState));
+        log.append(QString("entryB: '%1' --> '%2' --> '%3'").arg(previousState,
+                                                                 trigger.name(),
+                                                                 currentState));
     }));
     QVERIFY(stateMachine.setStateExitAction(
-                "b", [&](const Event &event, const QString &fromState, const QString &toState)
+                "b", [&](const Event &trigger, const QString &currentState, const QString &nextState)
     {
-        log.append(QString("exitB: '%1' --> '%2' --> '%3'").arg(fromState, event.name(), toState));
+        log.append(QString("exitB: '%1' --> '%2' --> '%3'").arg(currentState,
+                                                                trigger.name(),
+                                                                nextState));
     }));
 
     QVERIFY(stateMachine.addState("c"));
     QVERIFY(stateMachine.setStateEntryAction(
                 "c",
-                [&](const Event &event, const QString &fromState, const QString &toState)
+                [&](const Event &trigger, const QString &currentState, const QString &previousState)
     {
-        log.append(QString("entryC: '%1' --> '%2' --> '%3'").arg(fromState, event.name(), toState));
+        log.append(QString("entryC: '%1' --> '%2' --> '%3'").arg(previousState,
+                                                                 trigger.name(),
+                                                                 currentState));
     }));
 
     QVERIFY(stateMachine.setInitialTransition(
@@ -1019,22 +1131,22 @@ void TestStateMachine::testStateAndTransitionMethods()
         log.append(QString("init: '%1' --> '%2'").arg(trigger.name(), initialState));
     }));
 
-    auto actionAB = [&](const Event &trigger, const QString &fromState, const QString &toState)
+    auto actionAB = [&](const Event &trigger, const QString &currentState, const QString &nextState)
     {
         log.append(QString("actionAB: '%1' --> '%2' --> '%3'")
-                   .arg(fromState, trigger.name(), toState));
+                   .arg(currentState, trigger.name(), nextState));
     };
-    auto guardAB = [&](const Event &trigger, const QString &fromState, const QString &toState)
+    auto guardAB = [&](const Event &trigger, const QString &currentState, const QString &nextState)
     {
         if (guardValueAB)
         {
             log.append(QString("guardAB: '%1' --> '%2' --> '%3': Allowed")
-                       .arg(fromState, trigger.name(), toState));
+                       .arg(currentState, trigger.name(), nextState));
         }
         else
         {
             log.append(QString("guardAB: '%1' --> '%2' --> '%3': Blocked")
-                       .arg(fromState, trigger.name(), toState));
+                       .arg(currentState, trigger.name(), nextState));
         }
 
         return guardValueAB;
@@ -1065,50 +1177,50 @@ void TestStateMachine::testStateAndTransitionMethods()
     QVERIFY(stateMachine.setDefaultTransition(
                 "a",
                 "a",
-                [&](const Event &trigger, const QString &fromState, const QString &toState)
+                [&](const Event &trigger, const QString &currentState, const QString &nextState)
     {
         log.append(QString("defaultActionAA: '%1' --> '%2' --> '%3'")
-                   .arg(fromState, trigger.name(), toState));
+                   .arg(currentState, trigger.name(), nextState));
     }));
 
-    auto actionBB = [&](const Event &event, const QString &fromState, const QString &toState)
+    auto actionBB = [&](const Event &trigger, const QString &currentState, const QString &nextState)
     {
         log.append(QString("actionBB: '%1' --> '%2' --> '%3'")
-                   .arg(fromState, event.name(), toState));
+                   .arg(currentState, trigger.name(), nextState));
     };
-    auto guardBB = [&](const Event &event, const QString &fromState, const QString &toState)
+    auto guardBB = [&](const Event &trigger, const QString &currentState, const QString &nextState)
     {
         if (guardValueBB)
         {
             log.append(QString("guardBB: '%1' --> '%2' --> '%3': Allowed")
-                       .arg(fromState, event.name(), toState));
+                       .arg(currentState, trigger.name(), nextState));
         }
         else
         {
             log.append(QString("guardBB: '%1' --> '%2' --> '%3': Blocked")
-                       .arg(fromState, event.name(), toState));
+                       .arg(currentState, trigger.name(), nextState));
         }
 
         return guardValueBB;
     };
     QVERIFY(stateMachine.addStateTransition("b", "b_to_b", "b", actionBB, guardBB));
 
-    auto actionBC = [&](const Event &event, const QString &fromState, const QString &toState)
+    auto actionBC = [&](const Event &trigger, const QString &currentState, const QString &nextState)
     {
         log.append(QString("actionBC: '%1' --> '%2' --> '%3'")
-                   .arg(fromState, event.name(), toState));
+                   .arg(currentState, trigger.name(), nextState));
     };
-    auto guardBC = [&](const Event &event, const QString &fromState, const QString &toState)
+    auto guardBC = [&](const Event &trigger, const QString &currentState, const QString &nextState)
     {
         if (guardValueBC)
         {
             log.append(QString("guardBC: '%1' --> '%2' --> '%3': Allowed")
-                       .arg(fromState, event.name(), toState));
+                       .arg(currentState, trigger.name(), nextState));
         }
         else
         {
             log.append(QString("guardBC: '%1' --> '%2' --> '%3': Blocked")
-                       .arg(fromState, event.name(), toState));
+                       .arg(currentState, trigger.name(), nextState));
         }
 
         return guardValueBC;
@@ -1463,6 +1575,146 @@ void TestStateMachine::testAddEventFromAction()
     QVERIFY(stateMachine.hasPendingEvents());
     QVERIFY(stateMachine.processNextEvent());
     QCOMPARE(stateMachine.currentState(), QString("c"));
+}
+
+// Test: Helper methods for creating actions and guard conditions (all arguments) ------------------
+
+void TestStateMachine::testCreateClassMethodsFull()
+{
+    LogHelper logHelper;
+
+    // Initialize and validate the state machine
+    StateMachine stateMachine;
+
+    QVERIFY(stateMachine.addState("a"));
+    QVERIFY(stateMachine.setStateEntryAction(
+                "a", createStateEntryAction(&logHelper, &LogHelper::stateEntryActionFull)));
+    QVERIFY(stateMachine.setStateExitAction(
+                "a", createStateExitAction(&logHelper, &LogHelper::stateExitActionFull)));
+
+    QVERIFY(stateMachine.addState("b"));
+
+    QVERIFY(stateMachine.setInitialTransition(
+                "a", createInitialTransitionAction(&logHelper,
+                                                   &LogHelper::initialTransitionActionFull)));
+
+    QVERIFY(stateMachine.addInternalTransition(
+                "a",
+                "event1",
+                createInternalTransitionAction(
+                    &logHelper, &LogHelper::internalTransitionActionFull),
+                createInternalTransitionGuardCondition(
+                    &logHelper, &LogHelper::internalTransitionGuardConditionFull)));
+
+    QVERIFY(stateMachine.addStateTransition(
+                "a",
+                "event2",
+                "b",
+                createStateTransitionAction(&logHelper, &LogHelper::stateTransitionActionFull),
+                createStateTransitionGuardCondition(
+                    &logHelper, &LogHelper::stateTransitionGuardConditionFull)));
+
+    QVERIFY(stateMachine.validate());
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
+
+    // Start the state machine
+    QVERIFY(stateMachine.start());
+    QVERIFY(stateMachine.isStarted());
+
+    // Transition to final state
+    QVERIFY(stateMachine.addEventToBack("event1"));
+    QVERIFY(stateMachine.processNextEvent());
+    QVERIFY(!stateMachine.finalStateReached());
+    QVERIFY(stateMachine.isStarted());
+
+    QVERIFY(stateMachine.addEventToBack("event2"));
+    QVERIFY(stateMachine.processNextEvent());
+    QVERIFY(stateMachine.finalStateReached());
+    QVERIFY(!stateMachine.isStarted());
+
+    // Check log
+    QStringList expectedLog
+    {
+        "initialTransitionActionFull: [Started], [a]",
+        "stateEntryActionFull: [Started], [a], []",
+        "internalTransitionGuardConditionFull: [event1], [a]",
+        "internalTransitionActionFull: [event1], [a]",
+        "stateTransitionGuardConditionFull: [event2], [a], [b]",
+        "stateExitActionFull: [event2], [a], [b]",
+        "stateTransitionActionFull: [event2], [a], [b]",
+    };
+
+    QCOMPARE(logHelper.log(), expectedLog);
+}
+
+// Test: Helper methods for creating actions and guard conditions (no arguments) -------------------
+
+void TestStateMachine::testCreateClassMethodsVoid()
+{
+    LogHelper logHelper;
+
+    // Initialize and validate the state machine
+    StateMachine stateMachine;
+
+    QVERIFY(stateMachine.addState("a"));
+    QVERIFY(stateMachine.setStateEntryAction(
+                "a", createStateEntryAction(&logHelper, &LogHelper::stateEntryActionVoid)));
+    QVERIFY(stateMachine.setStateExitAction(
+                "a", createStateExitAction(&logHelper, &LogHelper::stateExitActionVoid)));
+
+    QVERIFY(stateMachine.addState("b"));
+
+    QVERIFY(stateMachine.setInitialTransition(
+                "a", createInitialTransitionAction(&logHelper,
+                                                   &LogHelper::initialTransitionActionVoid)));
+
+    QVERIFY(stateMachine.addInternalTransition(
+                "a",
+                "event1",
+                createInternalTransitionAction(
+                    &logHelper, &LogHelper::internalTransitionActionVoid),
+                createInternalTransitionGuardCondition(
+                    &logHelper, &LogHelper::internalTransitionGuardConditionVoid)));
+
+    QVERIFY(stateMachine.addStateTransition(
+                "a",
+                "event2",
+                "b",
+                createStateTransitionAction(&logHelper, &LogHelper::stateTransitionActionVoid),
+                createStateTransitionGuardCondition(
+                    &logHelper, &LogHelper::stateTransitionGuardConditionVoid)));
+
+    QVERIFY(stateMachine.validate());
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
+
+    // Start the state machine
+    QVERIFY(stateMachine.start());
+    QVERIFY(stateMachine.isStarted());
+
+    // Transition to final state
+    QVERIFY(stateMachine.addEventToBack("event1"));
+    QVERIFY(stateMachine.processNextEvent());
+    QVERIFY(!stateMachine.finalStateReached());
+    QVERIFY(stateMachine.isStarted());
+
+    QVERIFY(stateMachine.addEventToBack("event2"));
+    QVERIFY(stateMachine.processNextEvent());
+    QVERIFY(stateMachine.finalStateReached());
+    QVERIFY(!stateMachine.isStarted());
+
+    // Check log
+    QStringList expectedLog
+    {
+        "initialTransitionActionVoid",
+        "stateEntryActionVoid",
+        "internalTransitionGuardConditionVoid",
+        "internalTransitionActionVoid",
+        "stateTransitionGuardConditionVoid",
+        "stateExitActionVoid",
+        "stateTransitionActionVoid",
+    };
+
+    QCOMPARE(logHelper.log(), expectedLog);
 }
 
 // Main function -----------------------------------------------------------------------------------

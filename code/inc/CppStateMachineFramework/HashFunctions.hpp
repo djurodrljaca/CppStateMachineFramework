@@ -15,7 +15,7 @@
 /*!
  * \file
  *
- * Contains a class for an event
+ * Contains hash functions
  */
 
 #pragma once
