@@ -230,6 +230,14 @@ public:
     bool processNextEvent();
 
     /*!
+     * Processes all pending events and executes the state action of the current state
+     *
+     * \retval  true    Success
+     * \retval  false   Failure (state machine not started, failed to process pending events)
+     */
+    bool poll();
+
+    /*!
      * Adds a new state to the state machine
      *
      * \param   stateName   State name
@@ -249,6 +257,17 @@ public:
      * \retval  false   Failure (state machine already started, empty action, state does not exit)
      */
     bool setStateEntryAction(const QString &stateName, StateEntryAction entryAction);
+
+    /*!
+     * Sets a state's state action
+     *
+     * \param   stateName   State name
+     * \param   stateAction State action method
+     *
+     * \retval  true    Success
+     * \retval  false   Failure (state machine already started, empty action, state does not exit)
+     */
+    bool setStateAction(const QString &stateName, StateAction stateAction);
 
     /*!
      * Sets a state's exit action
@@ -411,6 +430,9 @@ private:
         //! Holds an optional state entry action method
         StateEntryAction entryAction;
 
+        //! Holds an optional state action method
+        StateAction stateAction;
+
         //! Holds an optional state exit action method
         StateExitAction exitAction;
 
@@ -445,6 +467,16 @@ private:
      *          just to be able to stop the state machine after the mutex was locked.
      */
     bool stopInternal();
+
+    /*!
+     * Processes the event
+     *
+     * \param   event   Event to process
+     *
+     * \retval  true    Success
+     * \retval  false   Failure (invalid current state)
+     */
+    bool processEvent(Event &&event);
 
     /*!
      * Traverses from the specified state to all possible states from the configured transitions

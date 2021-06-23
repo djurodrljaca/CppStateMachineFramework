@@ -62,6 +62,15 @@ using StateEntryAction = std::function<void(const Event &trigger,
 // -------------------------------------------------------------------------------------------------
 
 /*!
+ * Type alias for a state action method
+ *
+ * \param   currentState    Name of the current state
+ */
+using StateAction = std::function<void(const QString &currentState)>;
+
+// -------------------------------------------------------------------------------------------------
+
+/*!
  * Type alias for a state exit action method
  *
  * \param   trigger         Event that triggered the transition from the state
@@ -164,6 +173,24 @@ StateEntryAction createStateEntryAction(
 //! Helper method for creating state entry actions
 template<typename T>
 StateEntryAction createStateEntryAction(T *instance, void (T::*method)())
+{
+    return std::bind(method, instance);
+}
+
+// -------------------------------------------------------------------------------------------------
+
+//! Helper method for creating state actions
+template<typename T>
+StateAction createStateAction(T *instance, void (T::*method)(const QString &))
+{
+    return std::bind(method, instance, std::placeholders::_1);
+}
+
+// -------------------------------------------------------------------------------------------------
+
+//! Helper method for creating state actions
+template<typename T>
+StateAction createStateAction(T *instance, void (T::*method)())
 {
     return std::bind(method, instance);
 }

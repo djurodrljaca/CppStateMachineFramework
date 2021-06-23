@@ -5,6 +5,7 @@ The state machine shall be divided into the following segments:
 * Configuration
 * Validation
 * Event processing
+* Polling
 * Startup procedure
 * Shutdown procedure
 
@@ -18,7 +19,7 @@ Class diagram for the state machine framework:
 The state machine shall be configured by:
 
 * adding states
-* setting entry and/or exit actions to states (optional)
+* setting entry, state, and/or exit actions to states (optional)
 * setting the initial transition
 * adding state and/or internal transitions to states (optional)
 * setting default state or internal transition to states (optional)
@@ -29,12 +30,11 @@ The state machine shall be configured by:
 The state machine shall have a container for all of its states. It shall be possible to add states
 but not to remove or rename them.
 
-When a state is added it shall be possible to set also its optional entry and/or exit action.
-
 A state shall have:
 
 * a name
 * an entry action (optional)
+* a state action (optional)
 * an exit action (optional)
 * state transitions (optional)
 * internal transitions (optional)
@@ -155,7 +155,7 @@ A state machine shall be valid if:
 * all internal transitions have actions
 * all state and internal transitions have a valid trigger (non-empty event name)
 * at most one of the default transitions (state or internal) is set in each state
-* final states do not have their exit action set
+* final states do not have their state or exit action set
 * all states of the state machine can be reached
 
 The validation shall be done as soon as it makes sense:
@@ -190,6 +190,14 @@ only ways to change the state of the state machine.
 Events shall be processed using the following workflows:
 
 ![Transition workflow](Diagrams/FlowCharts/TransitionWorkflow.svg "Transition workflow")
+
+
+## Polling
+
+It shall be possible to poll the state machine. Each time the state machine is polled it shall
+execute all pending events and then execute the current state's state action (if it is set).
+
+![Polling workflow](Diagrams/FlowCharts/PollingWorkflow.svg "Polling workflow")
 
 
 ## Startup procedure

@@ -35,7 +35,8 @@
 // -------------------------------------------------------------------------------------------------
 
 //! Logging category for the state machine
-static const QLoggingCategory s_loggingCategory("CppStateMachineFramework.StateMachine");
+static const QLoggingCategory s_loggingCategory("CppStateMachineFramework.StateMachine",
+                                                QtWarningMsg);
 
 // -------------------------------------------------------------------------------------------------
 
@@ -122,15 +123,23 @@ bool StateMachine::validate()
     // Validate final states
     QSet<QString> availableStates;
 
-    for (auto it_state = m_states.begin(); it_state != m_states.end(); it_state++)
+    for (const auto &m_state : m_states)
     {
-        const QString &stateName = it_state->first;
-        const StateData &stateData = it_state->second;
+        const QString &stateName = m_state.first;
+        const StateData &stateData = m_state.second;
         availableStates.insert(stateName);
 
         if (isFinalState(stateData))
         {
-            // This is a final state, check if it has an exit action
+            // This is a final state, check if it has a state or an exit action
+            if (stateData.stateAction)
+            {
+                qCWarning(s_loggingCategory)
+                        << "A final state cannot have a state action:" << stateName;
+                m_validationStatus = ValidationStatus::Invalid;
+                return false;
+            }
+
             if (stateData.exitAction)
             {
                 qCWarning(s_loggingCategory)
@@ -364,7 +373,58 @@ bool StateMachine::processNextEvent()
 
     eventQueuelocker.unlock();
 
-    // Check if a transition needs to be executed
+    if (!processEvent(std::move(event)))
+    {
+        // This should not be possible as the current state should always be valid
+        qCWarning(s_loggingCategory) << "Failed to process event!";
+        return false;
+    }
+
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool StateMachine::poll()
+{
+    QMutexLocker apiLocker(&m_apiMutex);
+
+    qCDebug(s_loggingCategory) << "Polling...";
+
+    // Check if the state machine is started
+    if (!isStarted())
+    {
+        qCWarning(s_loggingCategory) << "State machine is not started";
+        return false;
+    }
+
+    // Check if there are any pending events to process
+    QMutexLocker eventQueueLocker(&m_eventQueueMutex);
+
+    while (!m_eventQueue.empty())
+    {
+        // Take the next pending event
+        auto event = std::move(m_eventQueue.front());
+        m_eventQueue.pop_front();
+        qCDebug(s_loggingCategory) << "Processing event:" << event.name();
+
+        eventQueueLocker.unlock();
+
+        // Process the event
+        if (!processEvent(std::move(event)))
+        {
+            // This should not be possible as the current state should always be valid
+            qCWarning(s_loggingCategory) << "Failed to process event!";
+            return false;
+        }
+
+        // Re-lock the event queue so that it's state can be queried again
+        eventQueueLocker.relock();
+    }
+
+    eventQueueLocker.unlock();
+
+    // Get current state's data
     auto itState = m_states.find(m_currentState);
 
     if (itState == m_states.end())
@@ -377,56 +437,15 @@ bool StateMachine::processNextEvent()
 
     const auto &stateData = itState->second;
 
-    if (!stateData.internalTransitions.empty())
+    // Execute current state's state action
+    if (stateData.stateAction)
     {
-        // Check if an internal transition needs to be triggered
-        auto itTransition = stateData.internalTransitions.find(event.name());
-
-        if (itTransition != stateData.internalTransitions.end())
-        {
-            // Execute internal transition
-            executeInternalTransition(itTransition->second, event);
-
-            qCDebug(s_loggingCategory) << "Event processed";
-            return true;
-        }
+        qCDebug(s_loggingCategory) << "Executing state's state action...";
+        stateData.stateAction(m_currentState);
+        qCDebug(s_loggingCategory) << "State's state action executed";
     }
 
-    if (!stateData.stateTransitions.empty())
-    {
-        // Check if a state transition needs to be triggered
-        auto itTransition = stateData.stateTransitions.find(event.name());
-
-        if (itTransition != stateData.stateTransitions.end())
-        {
-            // Execute state transition
-            executeStateTransition(itTransition->second, std::move(event));
-
-            qCDebug(s_loggingCategory) << "Event processed";
-            return true;
-        }
-    }
-
-    if (stateData.defaultInternalTransition)
-    {
-        // Execute default internal transition
-        executeInternalTransition(*stateData.defaultInternalTransition, event);
-
-        qCDebug(s_loggingCategory) << "Event processed";
-        return true;
-    }
-
-    if (stateData.defaultStateTransition)
-    {
-        // Execute default state transition
-        executeStateTransition(*stateData.defaultStateTransition, std::move(event));
-
-        qCDebug(s_loggingCategory) << "Event processed";
-        return true;
-    }
-
-    qCDebug(s_loggingCategory) << "No transitions for this event, ignore it:" << event.name();
-    qCDebug(s_loggingCategory) << "Event processed";
+    qCDebug(s_loggingCategory) << "Polling finished";
     return true;
 }
 
@@ -509,6 +528,53 @@ bool StateMachine::setStateEntryAction(const QString &stateName, StateEntryActio
     m_validationStatus = ValidationStatus::Unvalidated;
 
     qCDebug(s_loggingCategory) << "Set the state's entry action:" << stateName;
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool StateMachine::setStateAction(const QString &stateName, StateAction stateAction)
+{
+    QMutexLocker locker(&m_apiMutex);
+
+    // Check if a state's state action is allowed to be set at this time
+    if (isStarted())
+    {
+        qCWarning(s_loggingCategory)
+                << "State's state action can be set only when the state machine is stopped";
+        return false;
+    }
+
+    // Check if the action is empty
+    if (!stateAction)
+    {
+        qCWarning(s_loggingCategory) << "Invalid state's state action:" << stateName;
+        return false;
+    }
+
+    // Check if the state name is valid
+    auto itState = m_states.find(stateName);
+
+    if (itState == m_states.end())
+    {
+        qCWarning(s_loggingCategory) << "State does not exist:" << stateName;
+        return false;
+    }
+
+    // Check if state's state action already exists
+    auto &stateData = itState->second;
+
+    if (stateData.stateAction)
+    {
+        qCWarning(s_loggingCategory) << "The state's state action is already set:" << stateName;
+        return false;
+    }
+
+    // Set state's state action
+    stateData.stateAction = std::move(stateAction);
+    m_validationStatus = ValidationStatus::Unvalidated;
+
+    qCDebug(s_loggingCategory) << "Set the state's state action:" << stateName;
     return true;
 }
 
@@ -850,6 +916,77 @@ bool StateMachine::stopInternal()
 
     m_started = false;
     qCDebug(s_loggingCategory) << "State machine stopped";
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool StateMachine::processEvent(Event &&event)
+{
+    // Get current state's data
+    auto itState = m_states.find(m_currentState);
+
+    if (itState == m_states.end())
+    {
+        // This should not be possible as the current state cannot be changed externally and it
+        // should always store the name of an existing state
+        qCWarning(s_loggingCategory) << "Current state is invalid!";
+        return false;
+    }
+
+    const auto &stateData = itState->second;
+
+    // Check if a transition needs to be executed
+    if (!stateData.internalTransitions.empty())
+    {
+        // Check if an internal transition needs to be triggered
+        auto itTransition = stateData.internalTransitions.find(event.name());
+
+        if (itTransition != stateData.internalTransitions.end())
+        {
+            // Execute internal transition
+            executeInternalTransition(itTransition->second, event);
+
+            qCDebug(s_loggingCategory) << "Event processed";
+            return true;
+        }
+    }
+
+    if (!stateData.stateTransitions.empty())
+    {
+        // Check if a state transition needs to be triggered
+        auto itTransition = stateData.stateTransitions.find(event.name());
+
+        if (itTransition != stateData.stateTransitions.end())
+        {
+            // Execute state transition
+            executeStateTransition(itTransition->second, std::move(event));
+
+            qCDebug(s_loggingCategory) << "Event processed";
+            return true;
+        }
+    }
+
+    if (stateData.defaultInternalTransition)
+    {
+        // Execute default internal transition
+        executeInternalTransition(*stateData.defaultInternalTransition, event);
+
+        qCDebug(s_loggingCategory) << "Event processed";
+        return true;
+    }
+
+    if (stateData.defaultStateTransition)
+    {
+        // Execute default state transition
+        executeStateTransition(*stateData.defaultStateTransition, std::move(event));
+
+        qCDebug(s_loggingCategory) << "Event processed";
+        return true;
+    }
+
+    qCDebug(s_loggingCategory) << "No transitions for this event, ignore it:" << event.name();
+    qCDebug(s_loggingCategory) << "Event processed";
     return true;
 }
 

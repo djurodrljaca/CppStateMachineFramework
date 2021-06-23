@@ -128,3 +128,20 @@ endif
 
 stop
 @enduml
+
+'---------------------------------------------------------------------------------------------------
+
+@startuml PollingWorkflow
+start
+
+while (Has pending events?) is (yes)
+     :Process next pending event;
+endwhile (no)
+
+if (Current state has state action?) then (yes)
+     :Execute current state's state action;
+else (no)
+endif
+
+stop
+@enduml

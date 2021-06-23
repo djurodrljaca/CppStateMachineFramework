@@ -23,6 +23,7 @@
 
 // Qt includes
 #include <QtCore/QDebug>
+#include <QtCore/QLoggingCategory>
 #include <QtTest/QTest>
 
 // System includes
@@ -58,6 +59,7 @@ private slots:
     void testStartStop();
     void testAddState();
     void testSetStateEntryAction();
+    void testSetStateAction();
     void testSetStateExitAction();
     void testSetInitialTransition();
     void testAddStateTransition();
@@ -67,6 +69,7 @@ private slots:
     void testAddEventToFront();
     void testAddEventToBack();
     void testProcessNextEvent();
+    void testPoll();
     void testStateAndTransitionMethods();
     void testStateMachineWithLoop();
     void testAddEventFromAction();
@@ -75,6 +78,7 @@ private slots:
 
 private:
     const StateEntryAction m_dummyStateEntryAction;
+    const StateAction m_dummyStateAction;
     const StateExitAction m_dummyStateExitAction;
     const StateTransitionGuardCondition m_dummyStateTransitionGuard;
     const StateTransitionAction m_dummyStateTransitionAction;
@@ -108,6 +112,16 @@ public:
     void stateEntryActionVoid()
     {
         m_log.append("stateEntryActionVoid");
+    }
+
+    void stateActionFull(const QString &currentState)
+    {
+        m_log.append(QString("stateActionFull: [%1]").arg(currentState));
+    }
+
+    void stateActionVoid()
+    {
+        m_log.append("stateActionVoid");
     }
 
     void stateExitActionFull(const Event &trigger,
@@ -190,6 +204,7 @@ private:
 
 TestStateMachine::TestStateMachine()
     : m_dummyStateEntryAction([](auto &, auto &, auto &) {}),
+      m_dummyStateAction([](auto &) {}),
       m_dummyStateExitAction([](auto &, auto &, auto &) {}),
       m_dummyStateTransitionGuard([](auto &, auto &, auto &) { return true; }),
       m_dummyStateTransitionAction([](auto &, auto &, auto &) {}),
@@ -202,6 +217,7 @@ TestStateMachine::TestStateMachine()
 
 void TestStateMachine::initTestCase()
 {
+    QLoggingCategory::setFilterRules("*.debug=true");
 }
 
 void TestStateMachine::cleanupTestCase()
@@ -415,7 +431,10 @@ void TestStateMachine::testValidate()
     QVERIFY(!stateMachine.addState("c"));
     QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
 
-    QVERIFY(!stateMachine.setStateEntryAction("a", m_dummyStateExitAction));
+    QVERIFY(!stateMachine.setStateEntryAction("a", m_dummyStateEntryAction));
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
+
+    QVERIFY(!stateMachine.setStateAction("a", m_dummyStateAction));
     QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
 
     QVERIFY(!stateMachine.setStateExitAction("a", m_dummyStateExitAction));
@@ -433,7 +452,22 @@ void TestStateMachine::testValidate()
 
     // Add an invalid final state (no transitions from it to other states and an exit method)
     QVERIFY(stateMachine.addState("c"));
+    QVERIFY(stateMachine.addStateTransition("b", "to_c", "c"));
     QVERIFY(stateMachine.setStateExitAction("c", m_dummyStateExitAction));
+
+    QVERIFY(!stateMachine.validate());
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Invalid);
+
+    // Change "c" to a non-final state
+    QVERIFY(stateMachine.addStateTransition("c", "to_a", "a"));
+
+    QVERIFY(stateMachine.validate());
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
+
+    // Add an invalid final state (no transitions from it to other states and a state method)
+    QVERIFY(stateMachine.addState("d"));
+    QVERIFY(stateMachine.addStateTransition("b", "to_d", "d"));
+    QVERIFY(stateMachine.setStateAction("d", m_dummyStateAction));
 
     QVERIFY(!stateMachine.validate());
     QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Invalid);
@@ -590,6 +624,31 @@ void TestStateMachine::testSetStateEntryAction()
 
     // Set another valid entry action
     QVERIFY(!stateMachine.setStateEntryAction("a", m_dummyStateEntryAction));
+
+    // Set a valid entry action to a state that doesn't exist
+    QVERIFY(!stateMachine.setStateEntryAction("b", m_dummyStateEntryAction));
+}
+
+// Test: setStateAction() --------------------------------------------------------------------------
+
+void TestStateMachine::testSetStateAction()
+{
+    StateMachine stateMachine;
+
+    // Add a state
+    QVERIFY(stateMachine.addState("a"));
+
+    // Set an empty state action
+    QVERIFY(!stateMachine.setStateAction("a", {}));
+
+    // Set a valid state action
+    QVERIFY(stateMachine.setStateAction("a", m_dummyStateAction));
+
+    // Set another valid state action
+    QVERIFY(!stateMachine.setStateAction("a", m_dummyStateAction));
+
+    // Set a valid state action to a state that doesn't exist
+    QVERIFY(!stateMachine.setStateAction("b", m_dummyStateAction));
 }
 
 // Test: setStateExitAction() ----------------------------------------------------------------------
@@ -609,6 +668,9 @@ void TestStateMachine::testSetStateExitAction()
 
     // Set another valid exit action
     QVERIFY(!stateMachine.setStateExitAction("a", m_dummyStateExitAction));
+
+    // Set a valid exit action to a state that doesn't exist
+    QVERIFY(!stateMachine.setStateExitAction("b", m_dummyStateExitAction));
 }
 
 // Test: setInitialState() -------------------------------------------------------------------------
@@ -991,7 +1053,7 @@ void TestStateMachine::testProcessNextEvent()
     QVERIFY(!stateMachine.processNextEvent());
     QVERIFY(!stateMachine.hasPendingEvents());
 
-    // Add an unexpected event and process is
+    // Add an unexpected event and process it
     QVERIFY(stateMachine.addEventToBack("unexpected"));
     QVERIFY(stateMachine.hasPendingEvents());
 
@@ -999,7 +1061,7 @@ void TestStateMachine::testProcessNextEvent()
     QVERIFY(!stateMachine.hasPendingEvents());
     QCOMPARE(stateMachine.currentState(), QString("a"));
 
-    // Add an expected event and process is
+    // Add an expected event and process it
     QVERIFY(stateMachine.addEventToBack("a_to_b"));
     QVERIFY(stateMachine.hasPendingEvents());
 
@@ -1054,6 +1116,81 @@ void TestStateMachine::testProcessNextEvent()
     // Next (last) processed event must make a transition to state "d" (final state)
     QVERIFY(stateMachine.hasPendingEvents());
     QVERIFY(stateMachine.processNextEvent());
+    QVERIFY(!stateMachine.hasPendingEvents());
+    QCOMPARE(stateMachine.currentState(), QString("d"));
+    QVERIFY(stateMachine.finalStateReached());
+
+    auto event = stateMachine.takeFinalEvent();
+    QVERIFY(event);
+    QCOMPARE(event->name(), QString("c_to_d"));
+}
+
+// Test: poll() ------------------------------------------------------------------------------------
+
+void TestStateMachine::testPoll()
+{
+    // Initialize the state machine
+    StateMachine stateMachine;
+
+    QVERIFY(stateMachine.addState("a"));
+    QVERIFY(stateMachine.addState("b"));
+    QVERIFY(stateMachine.addState("c"));
+    QVERIFY(stateMachine.addState("d"));
+
+    QVERIFY(stateMachine.setInitialTransition("a"));
+
+    QVERIFY(stateMachine.addStateTransition("a", "a_to_b", "b"));
+    QVERIFY(stateMachine.setStateAction("a",
+                                        [&](auto &) { stateMachine.addEventToBack("a_to_b"); }));
+
+    QVERIFY(stateMachine.addStateTransition("b", "b_to_c", "c"));
+    QVERIFY(stateMachine.setStateAction("b",
+                                        [&](auto &) { stateMachine.addEventToBack("b_to_c"); }));
+
+    QVERIFY(stateMachine.addStateTransition("c", "c_to_d", "d"));
+    QVERIFY(stateMachine.setStateAction("c",
+                                        [&](auto &) { stateMachine.addEventToBack("c_to_d"); }));
+
+    // Try to poll an unvalidated state machine
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Unvalidated);
+
+    QVERIFY(!stateMachine.poll());
+
+    // Validate the state machine
+    QVERIFY(stateMachine.validate());
+    QCOMPARE(stateMachine.validationStatus(), StateMachine::ValidationStatus::Valid);
+
+    // Try to poll a stopped state machine
+    QVERIFY(!stateMachine.isStarted());
+
+    QVERIFY(!stateMachine.poll());
+
+    // Start the state machine
+    QVERIFY(stateMachine.start());
+    QVERIFY(stateMachine.isStarted());
+    QCOMPARE(stateMachine.currentState(), QString("a"));
+
+    // First polling cycle must create an event but stay in state "a"
+    QVERIFY(stateMachine.poll());
+
+    QVERIFY(stateMachine.hasPendingEvents());
+    QCOMPARE(stateMachine.currentState(), QString("a"));
+
+    // Next polling cycle must create another event and transition to state "b"
+    QVERIFY(stateMachine.poll());
+
+    QVERIFY(stateMachine.hasPendingEvents());
+    QCOMPARE(stateMachine.currentState(), QString("b"));
+
+    // Next polling cycle must create another event and transition to state "c"
+    QVERIFY(stateMachine.poll());
+
+    QVERIFY(stateMachine.hasPendingEvents());
+    QCOMPARE(stateMachine.currentState(), QString("c"));
+
+    // Next polling cycle must not create an event and transition to the final state "d"
+    QVERIFY(stateMachine.poll());
+
     QVERIFY(!stateMachine.hasPendingEvents());
     QCOMPARE(stateMachine.currentState(), QString("d"));
     QVERIFY(stateMachine.finalStateReached());

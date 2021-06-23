@@ -33,8 +33,10 @@ class StateMachine {
     +addEventToBack(event)
     +addEventToBack(eventName, eventParameter)
     +processNextEvent()
+    +poll()
     +addState(stateName)
     +setStateEntryAction(stateName, entryAction)
+    +setStateAction(stateName, stateAction)
     +setStateExitAction(stateName, exitAction)
     +initialState()
     +setInitialTransition(initialState, action)
@@ -50,6 +52,7 @@ class StateMachine {
 
 class State {
     +entryAction
+    +stateAction
     +exitAction
     +stateTransitions
     +internalTransitions

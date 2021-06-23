@@ -47,12 +47,31 @@ being processed. This could occur if:
   state entry and exit actions, transition guard conditions and actions)
 
 
-## [R2] State machine state
+## [R2] Polled state machine
+
+It shall be possible for the user of the state machine to trigger an action in a state machine state
+at any time. This is an optional feature of the state machine.
+
+The state machine shall process all pending events before the state action is executed.
+
+*Note: The state machine state shall not be directly controllable with polling as the only way to
+change the state machine state shall still be exclusive responsibility of event processing, but a
+state action could generate events that would result in change of the state machine state.*
+
+*Rationale: This shall improve performance of use-cases like file parsers where unnecessary events
+would have to be generated to signal that a byte or a line was read from the file. It also gives the
+user more possibilities for designing the state machine.*
+
+![Polling workflow](Diagrams/FlowCharts/PollingWorkflow.svg "Polling workflow")
+
+
+## [R3] State machine state
 
 A state machine state shall have the following properties:
 
 * a name (shall not be empty)
 * an entry action (optional)
+* a state action (optional)
 * an exit action (optional)
 * state transitions
 * internal transitions
@@ -61,7 +80,7 @@ A state machine state shall have the following properties:
 A state machine shall have at least one state.
 
 
-## [R2.1] Entry action
+## [R3.1] Entry action
 
 An entry action shall be executed on entry to the state and it shall have the following context when
 executed:
@@ -71,7 +90,15 @@ executed:
 * name of the previous state
 
 
-## [R2.2] Exit action
+## [R3.2] State action
+
+A state action shall be executed when the state machine is polled and it shall have the following
+context when executed:
+
+* name of the current state
+
+
+## [R3.3] Exit action
 
 An exit action shall be executed on exit from the state and it shall have the following context when
 executed:
@@ -81,7 +108,7 @@ executed:
 * name of the next state
 
 
-## [R2.3] Transitions
+## [R3.4] Transitions
 
 There shall be two types of transitions:
 
@@ -98,7 +125,7 @@ Workflow for executing transitions:
 ![Transition workflow](Diagrams/FlowCharts/TransitionWorkflow.svg "Transition workflow")
 
 
-## [R2.3.1] State transition
+## [R3.4.1] State transition
 
 A state transition shall have the following properties:
 
@@ -120,7 +147,7 @@ Workflow for executing state transitions:
 ![State transition workflow](Diagrams/FlowCharts/StateTransitionWorkflow.svg "State transition workflow")
 
 
-## [R2.3.1.1] State transition's guard condition
+## [R3.4.1.1] State transition's guard condition
 
 A state transition's guard condition shall have the following context when executed:
 
@@ -131,7 +158,7 @@ A state transition's guard condition shall have the following context when execu
 The result of executing a guard condition shall be whether the condition was satisfied or not.
 
 
-## [R2.3.1.2] State transition's action
+## [R3.4.1.2] State transition's action
 
 A state transition's action shall have the following context when executed:
 
@@ -140,7 +167,7 @@ A state transition's action shall have the following context when executed:
 * name of the next state
 
 
-## [R2.3.2] Internal transition
+## [R3.4.2] Internal transition
 
 An internal transition shall have the following properties:
 
@@ -156,7 +183,7 @@ Workflow for executing internal transitions:
 ![Internal transition workflow](Diagrams/FlowCharts/InternalTransitionWorkflow.svg "Internal transition workflow")
 
 
-## [R2.3.2.1] Internal transition's guard condition
+## [R3.4.2.1] Internal transition's guard condition
 
 An internal transition's guard condition shall have the following context when executed:
 
@@ -166,7 +193,7 @@ An internal transition's guard condition shall have the following context when e
 The result of executing a guard condition shall be whether the condition was satisfied or not.
 
 
-## [R2.3.2.2] Internal transition's action
+## [R3.4.2.2] Internal transition's action
 
 An internal transition's action shall have the following context when executed:
 
@@ -174,7 +201,7 @@ An internal transition's action shall have the following context when executed:
 * name of the current state
 
 
-## [R2.3.3] Default transition
+## [R3.4.3] Default transition
 
 It shall be possible to set a default transition that shall be executed only in case the event that
 is being processes does not trigger any of the state and internal transitions. The default
@@ -185,14 +212,14 @@ Workflow for executing default transitions shall be the same as with its non-def
 ordinary state or internal transition).
 
 
-## [R3] Initial state machine state
+## [R4] Initial state machine state
 
 It shall be possible to specify that a specific one state machine state shall be the initial state.
 It shall be the state to which the state machine shall transition to when the state machine is
 started.
 
 
-## [R4] Initial transition
+## [R5] Initial transition
 
 On startup the state machine transitions to the initial state with the specific event provided by
 the user when the state machine was started.
@@ -205,7 +232,7 @@ The initial transition's action shall have the following context when executed:
 * name of the initial state
 
 
-## [R5] Final state machine state
+## [R6] Final state machine state
 
 All state machine states that shall have no transitions to other state shall be treated as final
 states. When one of these states is reached the state machine shall be stopped and the event that
@@ -218,7 +245,7 @@ It shall be possible to setup a state machine with no final states. That kind of
 only be stopped by the user.
 
 
-## [R6] State machine validation
+## [R7] State machine validation
 
 It shall be possible to validate if the definition of states and transitions is valid.
 
@@ -230,7 +257,7 @@ The validation procedure shall validate that:
 * all states of the state machine can be reached
 
 
-## [R7] Startup procedure
+## [R8] Startup procedure
 
 To start the state machine the user shall have to provide an initial event so that it can be used to
 execute the initial transition to the initial state.
@@ -243,7 +270,7 @@ Workflow for executing the initial transition:
 ![Initial transition workflow](Diagrams/FlowCharts/InitialTransitionWorkflow.svg "Initial transition workflow")
 
 
-## [R8] Shutdown procedure
+## [R9] Shutdown procedure
 
 The user shall be able to stop the state machine at any time.
 
